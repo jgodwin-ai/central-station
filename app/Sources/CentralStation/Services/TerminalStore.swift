@@ -18,16 +18,41 @@ final class TerminalStore {
         let termView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 500))
         termView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
-        let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
+        let executable: String
         var args: [String]
-        if task.isResume {
-            args = ["--resume", task.sessionId]
-        } else {
-            args = ["--session-id", task.sessionId]
-            if let mode = task.permissionMode {
-                args += ["--permission-mode", mode]
+
+        if let sshHost = task.sshHost {
+            // Remote task: launch via SSH with reverse tunnel for hooks
+            executable = "/usr/bin/ssh"
+            args = [
+                "-t",
+                "-R", "\(HookServer.defaultPort):localhost:\(HookServer.defaultPort)",
+                sshHost
+            ]
+            var remoteCmd: String
+            if task.isResume {
+                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --resume \(task.sessionId)"
+            } else {
+                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --session-id \(task.sessionId)"
+                if let mode = task.permissionMode {
+                    remoteCmd += " --permission-mode \(mode)"
+                }
+                remoteCmd += " \(shellEscape(task.prompt))"
             }
-            args.append(task.prompt)
+            args.append(remoteCmd)
+        } else {
+            // Local task: launch claude directly
+            let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
+            executable = claudePath
+            if task.isResume {
+                args = ["--resume", task.sessionId]
+            } else {
+                args = ["--session-id", task.sessionId]
+                if let mode = task.permissionMode {
+                    args += ["--permission-mode", mode]
+                }
+                args.append(task.prompt)
+            }
         }
 
         let delegate = ProcessDelegate(onProcessExit: onProcessExit)
@@ -35,15 +60,19 @@ final class TerminalStore {
         termView.processDelegate = delegate
 
         termView.startProcess(
-            executable: claudePath,
+            executable: executable,
             args: args,
             environment: nil,
-            execName: "claude",
-            currentDirectory: task.worktreePath
+            execName: task.isRemote ? "ssh" : "claude",
+            currentDirectory: task.isRemote ? NSHomeDirectory() : task.worktreePath
         )
 
         terminals[task.id] = termView
         return termView
+    }
+
+    private func shellEscape(_ str: String) -> String {
+        "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     func hasTerminal(for taskId: String) -> Bool {
