@@ -44,6 +44,8 @@ struct PersistedTask: Codable {
     let projectPath: String
     let permissionMode: String?
     let status: TaskStatus
+    let remoteAlias: String?  // nil means local task
+    let sshHost: String?      // the SSH host for remote tasks
 }
 
 @Observable
@@ -62,7 +64,11 @@ final class AppTask: Identifiable, @unchecked Sendable {
     var permissionMode: String?
     var diff: String?
     var pendingPermission: String?
+    var remoteAlias: String?   // nil = local task
+    var sshHost: String?       // e.g. "user@host"
     var isResume: Bool = false
+
+    var isRemote: Bool { sshHost != nil }
 
     var elapsed: String {
         guard let startedAt else { return "--" }
@@ -82,7 +88,7 @@ final class AppTask: Identifiable, @unchecked Sendable {
         self.permissionMode = config.permissionMode
     }
 
-    init(id: String, description: String, prompt: String, worktreePath: String, projectPath: String, permissionMode: String? = nil) {
+    init(id: String, description: String, prompt: String, worktreePath: String, projectPath: String, permissionMode: String? = nil, remoteAlias: String? = nil, sshHost: String? = nil) {
         self.id = id
         self.description = description
         self.prompt = prompt
@@ -90,6 +96,8 @@ final class AppTask: Identifiable, @unchecked Sendable {
         self.worktreePath = worktreePath
         self.projectPath = projectPath
         self.permissionMode = permissionMode
+        self.remoteAlias = remoteAlias
+        self.sshHost = sshHost
     }
 
     init(persisted: PersistedTask) {
@@ -101,6 +109,8 @@ final class AppTask: Identifiable, @unchecked Sendable {
         self.projectPath = persisted.projectPath
         self.permissionMode = persisted.permissionMode
         self.status = persisted.status
+        self.remoteAlias = persisted.remoteAlias
+        self.sshHost = persisted.sshHost
         self.isResume = true // persisted tasks have already run once
     }
 
@@ -113,7 +123,9 @@ final class AppTask: Identifiable, @unchecked Sendable {
             worktreePath: worktreePath,
             projectPath: projectPath,
             permissionMode: permissionMode,
-            status: status
+            status: status,
+            remoteAlias: remoteAlias,
+            sshHost: sshHost
         )
     }
 }
