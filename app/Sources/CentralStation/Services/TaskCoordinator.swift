@@ -124,6 +124,7 @@ final class TaskCoordinator {
     }
 
     func addRemoteTask(id: String, description: String, prompt: String, permissionMode: String?, remote: RemoteConfig, remotePath: String) async throws {
+        try await TerminalLauncher.installHooksOnRemote(host: remote.sshHost)
         try await WorktreeManager.ensureGitRepoRemote(host: remote.sshHost, at: remotePath)
         let worktreePath = try await WorktreeManager.createWorktreeRemote(
             host: remote.sshHost, projectPath: remotePath, taskId: id

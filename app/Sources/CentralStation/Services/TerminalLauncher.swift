@@ -86,6 +86,51 @@ enum TerminalLauncher {
         try data.write(to: URL(fileURLWithPath: userSettingsPath))
     }
 
+    static func installHooksOnRemote(host: String) async throws {
+        let port = HookServer.defaultPort
+
+        _ = try await RemoteShell.run(host: host, command: "mkdir -p $HOME/.claude")
+
+        let pythonScript = """
+        import json, os
+
+        settings_path = os.path.expanduser('~/.claude/settings.json')
+
+        try:
+            with open(settings_path) as f:
+                settings = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            settings = {}
+
+        curl_base = 'curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)'
+        curl_opts = " -H 'Content-Type: application/json' -d \\"$(cat)\\" || true"
+
+        hooks = {
+            'Stop': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/stop' + curl_opts}]}],
+            'Notification': [
+                {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'permission_prompt'},
+                {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'idle_prompt'},
+                {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'elicitation_dialog'}
+            ],
+            'PermissionRequest': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/permission' + curl_opts}]}]
+        }
+
+        settings.setdefault('hooks', {}).update(hooks)
+        settings['hooks'].pop('PreToolUse', None)
+
+        with open(settings_path, 'w') as f:
+            json.dump(settings, f, indent=2)
+
+        print('Hooks installed successfully')
+        """
+
+        // Base64 encode the script to avoid shell escaping nightmares
+        guard let scriptData = pythonScript.data(using: .utf8) else { return }
+        let base64Script = scriptData.base64EncodedString()
+
+        _ = try await RemoteShell.run(host: host, command: "echo \(base64Script) | base64 -d | python3")
+    }
+
     static func shellEscape(_ str: String) -> String {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
