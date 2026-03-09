@@ -8,6 +8,7 @@ final class TaskCoordinator {
     var projectPath: String = ""
     var poppedOutTaskIds: Set<String> = []
     private let hookServer = HookServer()
+    let remoteStore = RemoteStore()
     private var sessionToTaskId: [String: String] = [:]
 
     private static var persistencePath: String {
@@ -122,6 +123,29 @@ final class TaskCoordinator {
         saveTasks()
     }
 
+    func addRemoteTask(id: String, description: String, prompt: String, permissionMode: String?, remote: RemoteConfig, remotePath: String) async throws {
+        try await WorktreeManager.ensureGitRepoRemote(host: remote.sshHost, at: remotePath)
+        let worktreePath = try await WorktreeManager.createWorktreeRemote(
+            host: remote.sshHost, projectPath: remotePath, taskId: id
+        )
+        let task = AppTask(
+            id: id, description: description, prompt: prompt,
+            worktreePath: worktreePath, projectPath: remotePath,
+            permissionMode: permissionMode,
+            remoteAlias: remote.alias, sshHost: remote.sshHost
+        )
+        tasks.append(task)
+        sessionToTaskId[task.sessionId] = task.id
+        task.startedAt = Date()
+        task.status = .working
+        saveTasks()
+
+        // Update default directory on remote
+        var updated = remote
+        updated.defaultDirectory = remotePath
+        remoteStore.update(updated)
+    }
+
     func resumeTask(_ task: AppTask) {
         TerminalStore.shared.killTerminal(for: task.id)
         sessionToTaskId[task.sessionId] = task.id
@@ -132,7 +156,11 @@ final class TaskCoordinator {
     }
 
     func refreshDiff(for task: AppTask) async {
-        task.diff = await WorktreeManager.getDiff(worktreePath: task.worktreePath)
+        if let host = task.sshHost {
+            task.diff = await WorktreeManager.getDiffRemote(host: host, worktreePath: task.worktreePath)
+        } else {
+            task.diff = await WorktreeManager.getDiff(worktreePath: task.worktreePath)
+        }
     }
 
     func handleMergeAction(task: AppTask, action: MergeAction) async throws -> String? {
@@ -143,32 +171,44 @@ final class TaskCoordinator {
         case .createPR(let msg): message = msg
         }
 
-        try await WorktreeManager.commitWorktree(
-            worktreePath: task.worktreePath, message: message
-        )
-
-        var prURL: String?
-        switch action {
-        case .mergeToMain:
-            try await WorktreeManager.mergeToMain(
-                projectPath: task.projectPath, taskId: task.id, message: message
-            )
-        case .createBranch:
-            try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
-        case .createPR:
-            prURL = try await WorktreeManager.createPR(
-                projectPath: task.projectPath, taskId: task.id, message: message
-            )
+        if let host = task.sshHost {
+            try await WorktreeManager.commitWorktreeRemote(host: host, worktreePath: task.worktreePath, message: message)
+            var prURL: String?
+            switch action {
+            case .mergeToMain:
+                try await WorktreeManager.mergeToMainRemote(host: host, projectPath: task.projectPath, taskId: task.id, message: message)
+            case .createBranch:
+                try await WorktreeManager.pushBranchRemote(host: host, projectPath: task.projectPath, taskId: task.id)
+            case .createPR:
+                prURL = try await WorktreeManager.createPRRemote(host: host, projectPath: task.projectPath, taskId: task.id, message: message)
+            }
+            task.status = .completed
+            saveTasks()
+            return prURL
+        } else {
+            try await WorktreeManager.commitWorktree(worktreePath: task.worktreePath, message: message)
+            var prURL: String?
+            switch action {
+            case .mergeToMain:
+                try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
+            case .createBranch:
+                try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
+            case .createPR:
+                prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message)
+            }
+            task.status = .completed
+            saveTasks()
+            return prURL
         }
-
-        task.status = .completed
-        saveTasks()
-        return prURL
     }
 
     func deleteTask(_ task: AppTask) async {
         TerminalStore.shared.killTerminal(for: task.id)
-        await WorktreeManager.removeWorktree(projectPath: task.projectPath, taskId: task.id)
+        if let host = task.sshHost {
+            await WorktreeManager.removeWorktreeRemote(host: host, projectPath: task.projectPath, taskId: task.id)
+        } else {
+            await WorktreeManager.removeWorktree(projectPath: task.projectPath, taskId: task.id)
+        }
         sessionToTaskId.removeValue(forKey: task.sessionId)
         tasks.removeAll { $0.id == task.id }
         saveTasks()

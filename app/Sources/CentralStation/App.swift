@@ -73,6 +73,7 @@ struct CentralStationApp: App {
         coordinator.projectPath = FileManager.default.currentDirectoryPath
 
         coordinator.loadPersistedTasks()
+        coordinator.remoteStore.load()
 
         let args = CommandLine.arguments
         var configPath: String?
