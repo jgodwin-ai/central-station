@@ -1,0 +1,22 @@
+# Central Station - Example Task Config
+#
+# Usage: central-station tasks.example.yaml
+#
+# Each task launches a Claude Code instance in its own Terminal.app window,
+# with its own git worktree for isolation.
+
+project: /path/to/your/repo
+
+tasks:
+  - id: auth-refactor
+    description: "Refactor auth module to use JWT"
+    prompt: "Refactor the auth module in src/auth/ to use JWT tokens instead of sessions. Keep backward compatibility during migration."
+
+  - id: add-tests
+    description: "Add unit tests for payment service"
+    prompt: "Write comprehensive unit tests for src/services/payment.ts. Aim for >90% coverage. Use the existing test patterns in the project."
+
+  - id: fix-n-plus-one
+    description: "Fix N+1 query in user listing"
+    prompt: "The GET /users endpoint has an N+1 query problem. Fix it using eager loading. Check the ORM documentation for the correct approach."
+    permission_mode: auto
