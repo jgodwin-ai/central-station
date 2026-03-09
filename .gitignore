@@ -1,4 +1,4 @@
-node_modules/
-dist/
 .worktrees/
-*.tsbuildinfo
+.claude/settings.local.json
+.DS_Store
+app/.build/

@@ -1,0 +1,110 @@
+import SwiftUI
+
+enum DetailTab: String, CaseIterable {
+    case terminal = "Terminal"
+    case diff = "Diff"
+}
+
+struct TaskDetailView: View {
+    let task: AppTask
+    let onPopOut: () -> Void
+    let onMergeAction: (MergeAction) -> Void
+
+    @State private var activeTab: DetailTab = .terminal
+    @State private var showMergeSheet = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: task.status.icon)
+                            .foregroundStyle(task.status.color)
+                        Text(task.id)
+                            .font(.title2.bold())
+                        Text("— \(task.status.rawValue)")
+                            .font(.title3)
+                            .foregroundStyle(task.status.color)
+                    }
+                    Text(task.description)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Picker("", selection: $activeTab) {
+                        ForEach(DetailTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+
+                    if activeTab == .diff {
+                        Button(action: { showMergeSheet = true }) {
+                            Label("Merge", systemImage: "arrow.triangle.merge")
+                        }
+                    }
+
+                    Button(action: {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
+                    }) {
+                        Label("Finder", systemImage: "folder")
+                    }
+
+                    Button(action: {
+                        let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
+                        Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
+                    }) {
+                        Label("Terminal", systemImage: "terminal")
+                    }
+
+                    Button(action: onPopOut) {
+                        Label("Pop Out", systemImage: "rectangle.portrait.and.arrow.forward")
+                    }
+                }
+            }
+            .padding()
+
+            Divider()
+
+            // Notification banner when task needs input
+            if task.status == .waitingForInput {
+                HStack {
+                    Image(systemName: "exclamationmark.bubble.fill")
+                    Text("This task needs your input")
+                        .font(.callout.bold())
+                    Spacer()
+                    if let message = task.lastMessage {
+                        Text(message.prefix(100) + (message.count > 100 ? "..." : ""))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.orange.opacity(0.15))
+                .foregroundStyle(.orange)
+
+                Divider()
+            }
+
+            // Content
+            switch activeTab {
+            case .terminal:
+                EmbeddedTerminalView(task: task, onProcessExit: {
+                    task.status = .completed
+                })
+            case .diff:
+                FileDiffView(task: task)
+            }
+        }
+        .sheet(isPresented: $showMergeSheet) {
+            MergeSheet(taskId: task.id, worktreePath: task.worktreePath) { action in
+                onMergeAction(action)
+            }
+        }
+    }
+}
