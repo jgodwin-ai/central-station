@@ -137,7 +137,7 @@ struct ContentView: View {
             coordinator.tasks.forEach { _ in }
         }
         .sheet(isPresented: $showAddTask) {
-            AddTaskSheet(defaultProjectPath: coordinator.projectPath) { id, description, prompt, mode, customPath in
+            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, remote, remotePath in
                 Task {
                     try? await coordinator.addTask(
                         id: id, description: description,

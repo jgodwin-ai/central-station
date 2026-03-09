@@ -4,13 +4,24 @@ import AppKit
 struct AddTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     let defaultProjectPath: String
-    let onAdd: (String, String, String, String?, String?) -> Void
+    let remoteStore: RemoteStore
+    let onAdd: (String, String, String, String?, String?, RemoteConfig?, String?) -> Void
 
     @State private var description = ""
     @State private var prompt = ""
     @State private var permissionMode = "default"
     @State private var customPath = ""
     @State private var isGeneratingDescription = false
+
+    @State private var isRemote = false
+    @State private var selectedRemote: RemoteConfig?
+    @State private var remotePath = ""
+    @State private var connectionStatus: ConnectionStatus = .untested
+    @State private var showManageRemotes = false
+
+    enum ConnectionStatus {
+        case untested, testing, success(String), failed(String)
+    }
 
     private let permissionModes = ["default", "acceptEdits", "plan", "auto"]
 
@@ -19,7 +30,10 @@ struct AddTaskSheet: View {
     }
 
     private var isValid: Bool {
-        !description.isEmpty && !prompt.isEmpty && !taskId.isEmpty
+        if isRemote {
+            return !description.isEmpty && !prompt.isEmpty && !taskId.isEmpty && selectedRemote != nil && !remotePath.isEmpty
+        }
+        return !description.isEmpty && !prompt.isEmpty && !taskId.isEmpty
     }
 
     private var effectivePath: String {
@@ -32,6 +46,12 @@ struct AddTaskSheet: View {
                 .font(.title2.bold())
 
             Form {
+                Picker("Location", selection: $isRemote) {
+                    Text("Local").tag(false)
+                    Text("Remote").tag(true)
+                }
+                .pickerStyle(.segmented)
+
                 HStack {
                     TextField("Description", text: $description)
                         .textFieldStyle(.roundedBorder)
@@ -75,26 +95,67 @@ struct AddTaskSheet: View {
                     }
                 }
 
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Working Directory")
-                            .font(.caption)
-                        Text(effectivePath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Spacer()
-                    Button("Choose...") {
-                        pickFolder()
-                    }
-                    if !customPath.isEmpty {
-                        Button("Reset") {
-                            customPath = ""
+                if isRemote {
+                    HStack {
+                        Picker("Remote", selection: $selectedRemote) {
+                            Text("Select a remote...").tag(nil as RemoteConfig?)
+                            ForEach(remoteStore.remotes) { remote in
+                                Text(remote.alias).tag(remote as RemoteConfig?)
+                            }
                         }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+                        Button("Manage...") { showManageRemotes = true }
+                            .buttonStyle(.borderless)
+                    }
+
+                    switch connectionStatus {
+                    case .untested:
+                        EmptyView()
+                    case .testing:
+                        HStack {
+                            ProgressView().controlSize(.small)
+                            Text("Testing connection...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    case .success(let msg):
+                        Label("Connected: \(msg)", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    case .failed(let msg):
+                        Label("Failed: \(msg)", systemImage: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    if selectedRemote != nil {
+                        if case .success = connectionStatus {
+                            RemoteDirectoryBrowser(sshHost: selectedRemote!.sshHost, selectedPath: $remotePath)
+                        }
+                    }
+                }
+
+                if !isRemote {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Working Directory")
+                                .font(.caption)
+                            Text(effectivePath)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                        Button("Choose...") {
+                            pickFolder()
+                        }
+                        if !customPath.isEmpty {
+                            Button("Reset") {
+                                customPath = ""
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -105,8 +166,12 @@ struct AddTaskSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Launch") {
                     let mode = permissionMode == "default" ? nil : permissionMode
-                    let path = customPath.isEmpty ? nil : customPath
-                    onAdd(taskId, description, prompt, mode, path)
+                    if isRemote, let remote = selectedRemote {
+                        onAdd(taskId, description, prompt, mode, nil, remote, remotePath)
+                    } else {
+                        let path = customPath.isEmpty ? nil : customPath
+                        onAdd(taskId, description, prompt, mode, path, nil, nil)
+                    }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -114,11 +179,29 @@ struct AddTaskSheet: View {
             }
         }
         .padding()
-        .frame(width: 520, height: 440)
+        .frame(width: 520, height: isRemote ? 640 : 440)
         .onChange(of: prompt) {
             if description.isEmpty && !prompt.isEmpty && prompt.count > 20 {
                 generateDescription()
             }
+        }
+        .onChange(of: selectedRemote) { _, remote in
+            guard let remote else {
+                connectionStatus = .untested
+                return
+            }
+            connectionStatus = .testing
+            remotePath = remote.defaultDirectory ?? ""
+            Task {
+                let result = await remoteStore.testConnection(remote: remote)
+                switch result {
+                case .success(let msg): connectionStatus = .success(msg)
+                case .failure(let err): connectionStatus = .failed(err.localizedDescription)
+                }
+            }
+        }
+        .sheet(isPresented: $showManageRemotes) {
+            ManageRemotesSheet(remoteStore: remoteStore)
         }
     }
 
