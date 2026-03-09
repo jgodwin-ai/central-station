@@ -35,7 +35,36 @@ cat > "$SETTINGS_FILE" << 'HOOKEOF'
         ]
       }
     ],
-    "PreToolUse": [
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:19280/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:19280/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+          }
+        ]
+      },
+      {
+        "matcher": "elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:19280/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
       {
         "hooks": [
           {

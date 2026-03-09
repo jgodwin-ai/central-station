@@ -1,8 +1,17 @@
 import SwiftUI
 import AppKit
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var coordinator: TaskCoordinator?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        coordinator?.stop()
+    }
+}
+
 @main
 struct CentralStationApp: App {
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @State private var coordinator = TaskCoordinator()
     @State private var errorMessage: String?
     @State private var hasStarted = false
@@ -38,8 +47,8 @@ struct CentralStationApp: App {
             .task {
                 await startup()
             }
-            .onDisappear {
-                coordinator.stop()
+            .onAppear {
+                appDelegate.coordinator = coordinator
             }
         }
         .defaultSize(width: 1100, height: 700)
@@ -63,10 +72,8 @@ struct CentralStationApp: App {
 
         coordinator.projectPath = FileManager.default.currentDirectoryPath
 
-        // Load persisted tasks from previous sessions
         coordinator.loadPersistedTasks()
 
-        // Optionally load a config file if one exists
         let args = CommandLine.arguments
         var configPath: String?
 

@@ -60,6 +60,9 @@ final class TerminalStore {
         guard let termView = terminals[taskId] else { return }
         let pid = termView.process?.shellPid ?? 0
         if pid > 0 {
+            // Kill the entire process group to catch child processes
+            kill(-pid, SIGTERM)
+            // Also kill the process directly as fallback
             kill(pid, SIGTERM)
         }
         termView.removeFromSuperview()

@@ -101,6 +101,7 @@ final class AppTask: Identifiable, @unchecked Sendable {
         self.projectPath = persisted.projectPath
         self.permissionMode = persisted.permissionMode
         self.status = persisted.status
+        self.isResume = true // persisted tasks have already run once
     }
 
     func toPersisted() -> PersistedTask {

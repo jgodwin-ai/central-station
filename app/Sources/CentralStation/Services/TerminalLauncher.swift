@@ -41,7 +41,30 @@ enum TerminalLauncher {
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
                 ]]
             ]],
-            "PreToolUse": [[
+            "Notification": [
+                [
+                    "hooks": [[
+                        "type": "command",
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    ]],
+                    "matcher": "permission_prompt"
+                ],
+                [
+                    "hooks": [[
+                        "type": "command",
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    ]],
+                    "matcher": "idle_prompt"
+                ],
+                [
+                    "hooks": [[
+                        "type": "command",
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    ]],
+                    "matcher": "elicitation_dialog"
+                ]
+            ],
+            "PermissionRequest": [[
                 "hooks": [[
                     "type": "command",
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\" || true"
@@ -51,7 +74,9 @@ enum TerminalLauncher {
 
         if var existingHooks = existing["hooks"] as? [String: Any] {
             existingHooks["Stop"] = hooks["Stop"]
-            existingHooks["PreToolUse"] = hooks["PreToolUse"]
+            existingHooks["Notification"] = hooks["Notification"]
+            existingHooks["PermissionRequest"] = hooks["PermissionRequest"]
+            existingHooks.removeValue(forKey: "PreToolUse")
             existing["hooks"] = existingHooks
         } else {
             existing["hooks"] = hooks

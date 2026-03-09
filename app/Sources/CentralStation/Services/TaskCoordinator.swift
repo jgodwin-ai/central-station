@@ -78,6 +78,9 @@ final class TaskCoordinator {
         hookServer.onPermissionRequest = { [weak self] sessionId, toolName in
             self?.handlePermission(sessionId: sessionId, toolName: toolName)
         }
+        hookServer.onNotification = { [weak self] sessionId, notifType in
+            self?.handleNotification(sessionId: sessionId, type: notifType)
+        }
 
         // Only create worktrees for new (pending) tasks from config
         let pendingTasks = tasks.filter { $0.status == .pending }
@@ -196,5 +199,26 @@ final class TaskCoordinator {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
         task.pendingPermission = toolName
         task.lastActivityAt = Date()
+        Notifier.notify(taskId: task.id, description: "\(task.description) — permission needed for \(toolName)")
+    }
+
+    private func handleNotification(sessionId: String, type: String) {
+        guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        task.lastActivityAt = Date()
+        switch type {
+        case "permission_prompt":
+            task.pendingPermission = "permission"
+            Notifier.notify(taskId: task.id, description: "\(task.description) — needs permission")
+        case "idle_prompt":
+            task.status = .waitingForInput
+            task.lastMessage = "Claude is idle"
+            Notifier.notify(taskId: task.id, description: "\(task.description) — idle")
+        case "elicitation_dialog":
+            task.status = .waitingForInput
+            task.lastMessage = "Claude is asking a question"
+            Notifier.notify(taskId: task.id, description: "\(task.description) — asking a question")
+        default:
+            break
+        }
     }
 }
