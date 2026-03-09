@@ -19,11 +19,16 @@ final class TerminalStore {
         termView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
         let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
-        var args = ["--session-id", task.sessionId]
-        if let mode = task.permissionMode {
-            args += ["--permission-mode", mode]
+        var args: [String]
+        if task.isResume {
+            args = ["--resume", task.sessionId]
+        } else {
+            args = ["--session-id", task.sessionId]
+            if let mode = task.permissionMode {
+                args += ["--permission-mode", mode]
+            }
+            args.append(task.prompt)
         }
-        args.append(task.prompt)
 
         let delegate = ProcessDelegate(onProcessExit: onProcessExit)
         delegates[task.id] = delegate
@@ -43,6 +48,12 @@ final class TerminalStore {
 
     func hasTerminal(for taskId: String) -> Bool {
         terminals[taskId] != nil
+    }
+
+    func killAll() {
+        for taskId in terminals.keys {
+            killTerminal(for: taskId)
+        }
     }
 
     func killTerminal(for taskId: String) {

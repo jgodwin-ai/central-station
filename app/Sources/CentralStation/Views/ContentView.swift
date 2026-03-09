@@ -36,6 +36,14 @@ struct ContentView: View {
                     onStop: { task in
                         TerminalStore.shared.killTerminal(for: task.id)
                         task.status = .completed
+                    },
+                    onDelete: { task in
+                        Task {
+                            if selectedTask?.id == task.id {
+                                selectedTask = nil
+                            }
+                            await coordinator.deleteTask(task)
+                        }
                     }
                 )
 
@@ -51,7 +59,8 @@ struct ContentView: View {
                 }
                 .padding(8)
             }
-            .navigationSplitViewColumnWidth(min: 250, ideal: 300)
+            .background(.background.secondary)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
         } detail: {
             if let task = selectedTask {
                 let isPoppedOut = coordinator.poppedOutTaskIds.contains(task.id)
@@ -93,15 +102,34 @@ struct ContentView: View {
                                     mergeError = error.localizedDescription
                                 }
                             }
+                        },
+                        onResume: {
+                            coordinator.resumeTask(task)
                         }
                     )
-                    .id(task.id)
+                    .id("\(task.id)-\(task.status)")
                 }
+            } else if coordinator.tasks.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "tram.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.tertiary)
+                    Text("No tasks yet")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                    Text("Create a task to start a Claude Code session")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                    Button("New Task") { showAddTask = true }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView(
                     "Select a Task",
                     systemImage: "sidebar.left",
-                    description: Text("Choose a task from the sidebar to view its terminal and diffs")
+                    description: Text("Choose a task from the sidebar")
                 )
             }
         }

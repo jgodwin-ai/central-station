@@ -10,6 +10,10 @@ final class TaskCoordinator {
     private let hookServer = HookServer()
     private var sessionToTaskId: [String: String] = [:]
 
+    private static var persistencePath: String {
+        (NSHomeDirectory() as NSString).appendingPathComponent(".claude/central-station-tasks.json")
+    }
+
     var needsInputCount: Int {
         tasks.filter { $0.status == .waitingForInput }.count
     }
@@ -25,10 +29,37 @@ final class TaskCoordinator {
         hooksInstalled = true
     }
 
+    func loadPersistedTasks() {
+        guard let data = FileManager.default.contents(atPath: Self.persistencePath),
+              let persisted = try? JSONDecoder().decode([PersistedTask].self, from: data) else {
+            return
+        }
+        for p in persisted {
+            // Skip if worktree no longer exists
+            guard FileManager.default.fileExists(atPath: p.worktreePath) else { continue }
+            // Skip if already loaded (e.g., from config file)
+            guard !tasks.contains(where: { $0.id == p.id }) else { continue }
+            let task = AppTask(persisted: p)
+            // Everything loads as stopped — user must resume
+            if task.status != .completed {
+                task.status = .stopped
+            }
+            tasks.append(task)
+            sessionToTaskId[task.sessionId] = task.id
+        }
+    }
+
+    func saveTasks() {
+        let persisted = tasks.map { $0.toPersisted() }
+        guard let data = try? JSONEncoder().encode(persisted) else { return }
+        try? data.write(to: URL(fileURLWithPath: Self.persistencePath))
+    }
+
     func loadConfig(from path: String) throws {
         let config = try ConfigLoader.load(from: path)
         self.projectPath = config.project
         for taskConfig in config.tasks {
+            guard !tasks.contains(where: { $0.id == taskConfig.id }) else { continue }
             let task = AppTask(config: taskConfig, worktreePath: "", projectPath: self.projectPath)
             tasks.append(task)
             sessionToTaskId[task.sessionId] = task.id
@@ -48,12 +79,13 @@ final class TaskCoordinator {
             self?.handlePermission(sessionId: sessionId, toolName: toolName)
         }
 
-        if !tasks.isEmpty {
+        // Only create worktrees for new (pending) tasks from config
+        let pendingTasks = tasks.filter { $0.status == .pending }
+        if !pendingTasks.isEmpty {
             try await WorktreeManager.ensureGitRepo(at: projectPath)
         }
 
-        // Create worktrees for pre-configured tasks
-        for task in tasks {
+        for task in pendingTasks {
             let worktreePath = try await WorktreeManager.createWorktree(
                 projectPath: projectPath, taskId: task.id
             )
@@ -61,6 +93,8 @@ final class TaskCoordinator {
             task.startedAt = Date()
             task.status = .working
         }
+
+        saveTasks()
     }
 
     func addTask(id: String, description: String, prompt: String, permissionMode: String? = nil, customProjectPath: String? = nil) async throws {
@@ -82,6 +116,16 @@ final class TaskCoordinator {
         sessionToTaskId[task.sessionId] = task.id
         task.startedAt = Date()
         task.status = .working
+        saveTasks()
+    }
+
+    func resumeTask(_ task: AppTask) {
+        TerminalStore.shared.killTerminal(for: task.id)
+        sessionToTaskId[task.sessionId] = task.id
+        task.isResume = true
+        task.startedAt = Date()
+        task.status = .working
+        saveTasks()
     }
 
     func refreshDiff(for task: AppTask) async {
@@ -91,33 +135,50 @@ final class TaskCoordinator {
     func handleMergeAction(task: AppTask, action: MergeAction) async throws -> String? {
         let message: String
         switch action {
-        case .mergeOnly(let msg): message = msg
-        case .mergeAndPush(let msg): message = msg
-        case .mergeAndPR(let msg): message = msg
+        case .mergeToMain(let msg): message = msg
+        case .createBranch(let msg): message = msg
+        case .createPR(let msg): message = msg
         }
 
-        try await WorktreeManager.commitAndMerge(
-            worktreePath: task.worktreePath,
-            projectPath: task.projectPath,
-            taskId: task.id,
-            message: message
+        try await WorktreeManager.commitWorktree(
+            worktreePath: task.worktreePath, message: message
         )
 
         var prURL: String?
         switch action {
-        case .mergeOnly:
-            break
-        case .mergeAndPush:
+        case .mergeToMain:
+            try await WorktreeManager.mergeToMain(
+                projectPath: task.projectPath, taskId: task.id, message: message
+            )
+        case .createBranch:
             try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
-        case .mergeAndPR:
-            prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message)
+        case .createPR:
+            prURL = try await WorktreeManager.createPR(
+                projectPath: task.projectPath, taskId: task.id, message: message
+            )
         }
 
         task.status = .completed
+        saveTasks()
         return prURL
     }
 
+    func deleteTask(_ task: AppTask) async {
+        TerminalStore.shared.killTerminal(for: task.id)
+        await WorktreeManager.removeWorktree(projectPath: task.projectPath, taskId: task.id)
+        sessionToTaskId.removeValue(forKey: task.sessionId)
+        tasks.removeAll { $0.id == task.id }
+        saveTasks()
+    }
+
     func stop() {
+        TerminalStore.shared.killAll()
+        for task in tasks {
+            if task.status == .working || task.status == .waitingForInput || task.status == .pending {
+                task.status = .stopped
+            }
+        }
+        saveTasks()
         hookServer.stop()
     }
 
@@ -127,6 +188,7 @@ final class TaskCoordinator {
         task.status = .waitingForInput
         task.lastMessage = message
         task.lastActivityAt = Date()
+        saveTasks()
         Notifier.notify(taskId: task.id, description: task.description)
     }
 

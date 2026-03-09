@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DetailTab: String, CaseIterable {
-    case terminal = "Terminal"
+    case terminal = "Claude Code"
     case diff = "Diff"
 }
 
@@ -9,6 +9,7 @@ struct TaskDetailView: View {
     let task: AppTask
     let onPopOut: () -> Void
     let onMergeAction: (MergeAction) -> Void
+    let onResume: () -> Void
 
     @State private var activeTab: DetailTab = .terminal
     @State private var showMergeSheet = false
@@ -34,6 +35,14 @@ struct TaskDetailView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
+                    if task.status == .stopped {
+                        Button(action: onResume) {
+                            Label("Resume", systemImage: "play.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                    }
+
                     Picker("", selection: $activeTab) {
                         ForEach(DetailTab.allCases, id: \.self) { tab in
                             Text(tab.rawValue).tag(tab)
@@ -44,25 +53,28 @@ struct TaskDetailView: View {
 
                     if activeTab == .diff {
                         Button(action: { showMergeSheet = true }) {
-                            Label("Merge", systemImage: "arrow.triangle.merge")
+                            Label("Accept", systemImage: "arrow.triangle.merge")
                         }
                     }
 
-                    Button(action: {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
-                    }) {
-                        Label("Finder", systemImage: "folder")
-                    }
-
-                    Button(action: {
-                        let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
-                        Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
-                    }) {
-                        Label("Terminal", systemImage: "terminal")
-                    }
-
-                    Button(action: onPopOut) {
-                        Label("Pop Out", systemImage: "rectangle.portrait.and.arrow.forward")
+                    Menu {
+                        Button(action: onPopOut) {
+                            Label("Pop Out Window", systemImage: "rectangle.portrait.and.arrow.forward")
+                        }
+                        Divider()
+                        Button(action: {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
+                        }) {
+                            Label("Open in Finder", systemImage: "folder")
+                        }
+                        Button(action: {
+                            let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
+                            Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
+                        }) {
+                            Label("Open in Terminal", systemImage: "terminal")
+                        }
+                    } label: {
+                        Label("Actions", systemImage: "ellipsis.circle")
                     }
                 }
             }
@@ -92,13 +104,34 @@ struct TaskDetailView: View {
             }
 
             // Content
-            switch activeTab {
-            case .terminal:
-                EmbeddedTerminalView(task: task, onProcessExit: {
-                    task.status = .completed
-                })
-            case .diff:
-                FileDiffView(task: task)
+            if task.status == .stopped {
+                VStack(spacing: 16) {
+                    Image(systemName: "stop.circle")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.tertiary)
+                    Text("Task is stopped")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                    Text("Resume to start a new Claude Code session in this worktree")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                    Button(action: onResume) {
+                        Label("Resume Task", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.large)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                switch activeTab {
+                case .terminal:
+                    EmbeddedTerminalView(task: task, onProcessExit: {
+                        task.status = .completed
+                    })
+                case .diff:
+                    FileDiffView(task: task)
+                }
             }
         }
         .sheet(isPresented: $showMergeSheet) {

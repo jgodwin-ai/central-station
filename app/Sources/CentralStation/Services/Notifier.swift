@@ -16,7 +16,7 @@ enum Notifier {
         }
         cooldowns[taskId] = now
 
-        let title = "Central Station: \(taskId)"
+        let title = "Claude Central Station: \(taskId)"
             .replacingOccurrences(of: "\"", with: "\\\"")
         let message = "\(description) — needs your input"
             .replacingOccurrences(of: "\"", with: "\\\"")

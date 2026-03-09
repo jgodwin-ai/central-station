@@ -30,7 +30,7 @@ cat > "$SETTINGS_FILE" << 'HOOKEOF'
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://127.0.0.1:19280/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\""
+            "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:19280/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
           }
         ]
       }
@@ -40,7 +40,7 @@ cat > "$SETTINGS_FILE" << 'HOOKEOF'
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://127.0.0.1:19280/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\""
+            "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:19280/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\" || true"
           }
         ]
       }

@@ -38,13 +38,13 @@ enum TerminalLauncher {
             "Stop": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\""
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
                 ]]
             ]],
             "PreToolUse": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\""
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\" || true"
                 ]]
             ]]
         ]

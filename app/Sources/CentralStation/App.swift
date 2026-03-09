@@ -14,7 +14,7 @@ struct CentralStationApp: App {
     }
 
     var body: some Scene {
-        Window("Central Station", id: "main") {
+        Window("Claude Central Station", id: "main") {
             Group {
                 if hasStarted {
                     ContentView(coordinator: coordinator)
@@ -30,13 +30,16 @@ struct CentralStationApp: App {
                     }
                     .padding()
                 } else {
-                    ProgressView("Starting Central Station...")
+                    ProgressView("Starting Claude Central Station...")
                         .padding()
                 }
             }
             .frame(minWidth: 800, minHeight: 500)
             .task {
                 await startup()
+            }
+            .onDisappear {
+                coordinator.stop()
             }
         }
         .defaultSize(width: 1100, height: 700)
@@ -58,8 +61,10 @@ struct CentralStationApp: App {
 
         Notifier.requestPermission()
 
-        // Default project path to cwd
         coordinator.projectPath = FileManager.default.currentDirectoryPath
+
+        // Load persisted tasks from previous sessions
+        coordinator.loadPersistedTasks()
 
         // Optionally load a config file if one exists
         let args = CommandLine.arguments

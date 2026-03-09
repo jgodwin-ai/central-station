@@ -29,7 +29,7 @@ struct HookInfoSheet: View {
                     Text("Hooks not installed")
                         .font(.headline)
                 }
-                Text("Install hooks to ~/.claude/settings.json so Claude Code reports status changes and permission requests to Central Station.")
+                Text("Install hooks to ~/.claude/settings.json so Claude Code reports status changes and permission requests to Claude Central Station.")
                     .foregroundStyle(.secondary)
 
                 Button("Install Hooks") {

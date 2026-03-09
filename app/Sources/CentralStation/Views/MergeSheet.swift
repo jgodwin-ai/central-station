@@ -1,9 +1,9 @@
 import SwiftUI
 
 enum MergeAction {
-    case mergeOnly(String)
-    case mergeAndPush(String)
-    case mergeAndPR(String)
+    case mergeToMain(String)
+    case createBranch(String)
+    case createPR(String)
 }
 
 struct MergeSheet: View {
@@ -17,10 +17,10 @@ struct MergeSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Commit & Merge")
+            Text("Accept Changes")
                 .font(.title2.bold())
 
-            Text("Commit all changes, merge **cs/\(taskId)** back into the base branch.")
+            Text("Commit changes from **cs/\(taskId)** and choose how to integrate them.")
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -47,18 +47,18 @@ struct MergeSheet: View {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
 
-                Menu("Merge") {
-                    Button("Merge locally") {
-                        onAction(.mergeOnly(commitMessage))
+                Menu("Accept") {
+                    Button("Merge to main") {
+                        onAction(.mergeToMain(commitMessage))
                         dismiss()
                     }
-                    Button("Merge & push") {
-                        onAction(.mergeAndPush(commitMessage))
+                    Button("Create branch") {
+                        onAction(.createBranch(commitMessage))
                         dismiss()
                     }
                     Divider()
-                    Button("Merge & create PR") {
-                        onAction(.mergeAndPR(commitMessage))
+                    Button("Create PR") {
+                        onAction(.createPR(commitMessage))
                         dismiss()
                     }
                 }
@@ -71,7 +71,6 @@ struct MergeSheet: View {
     }
 
     private func generateMessage() async {
-        // Get the diff summary for context
         let diff: String
         do {
             diff = try await ShellHelper.runGit(in: worktreePath, args: ["diff", "HEAD", "--stat"])
@@ -87,7 +86,6 @@ struct MergeSheet: View {
             return
         }
 
-        // Ask Claude to generate a commit message
         let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
         let prompt = "Generate a concise git commit message (subject line + optional body) for these changes. Output ONLY the commit message, nothing else.\n\nTask: \(taskId)\n\nChanged files:\n\(diff)"
 

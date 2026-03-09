@@ -130,17 +130,16 @@ enum WorktreeManager {
         }
     }
 
-    static func commitAndMerge(worktreePath: String, projectPath: String, taskId: String, message: String) async throws {
-        // Check for uncommitted changes in the main working tree
+    static func commitWorktree(worktreePath: String, message: String) async throws {
+        _ = try await ShellHelper.runGit(in: worktreePath, args: ["add", "-A"])
+        _ = try? await ShellHelper.runGit(in: worktreePath, args: ["commit", "-m", message, "--allow-empty"])
+    }
+
+    static func mergeToMain(projectPath: String, taskId: String, message: String) async throws {
         let status = try await ShellHelper.runGit(in: projectPath, args: ["status", "--porcelain"])
         if !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw WorktreeError.dirtyWorkingTree
         }
-
-        // Commit changes in the worktree branch
-        _ = try await ShellHelper.runGit(in: worktreePath, args: ["add", "-A"])
-        _ = try? await ShellHelper.runGit(in: worktreePath, args: ["commit", "-m", message, "--allow-empty"])
-
         let taskBranch = "cs/\(taskId)"
         _ = try await ShellHelper.runGit(in: projectPath, args: ["merge", taskBranch, "--no-ff", "-m", "Merge \(taskBranch): \(message)"])
     }
@@ -152,9 +151,7 @@ enum WorktreeManager {
 
     static func createPR(projectPath: String, taskId: String, message: String) async throws -> String {
         let taskBranch = "cs/\(taskId)"
-        // Push first
         _ = try await ShellHelper.runGit(in: projectPath, args: ["push", "-u", "origin", taskBranch])
-        // Create PR via gh CLI
         let firstLine = message.split(separator: "\n").first.map(String.init) ?? "Changes from \(taskId)"
         let result = try await ShellHelper.run("/usr/bin/env", arguments: [
             "gh", "pr", "create",

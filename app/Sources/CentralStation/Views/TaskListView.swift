@@ -5,6 +5,7 @@ struct TaskListView: View {
     @Binding var selectedTask: AppTask?
     let onFocus: (AppTask) -> Void
     let onStop: (AppTask) -> Void
+    let onDelete: (AppTask) -> Void
 
     private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
         var groups: [String: [AppTask]] = [:]
@@ -26,7 +27,7 @@ struct TaskListView: View {
             ForEach(groupedTasks, id: \.directory) { group in
                 Section {
                     ForEach(group.tasks) { task in
-                        TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) })
+                        TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
                             .tag(task.id)
                     }
                 } header: {
@@ -49,6 +50,7 @@ struct TaskRow: View {
     let task: AppTask
     let onFocus: () -> Void
     let onStop: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -82,6 +84,16 @@ struct TaskRow: View {
                 .clipShape(Capsule())
             }
 
+            if task.status == .completed {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Remove task and delete worktree")
+            }
+
             Text(task.elapsed)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -94,6 +106,8 @@ struct TaskRow: View {
                 Divider()
                 Button("Stop Task", role: .destructive) { onStop() }
             }
+            Divider()
+            Button("Remove Task", role: .destructive) { onDelete() }
         }
     }
 }

@@ -128,7 +128,7 @@ enum AppIcon {
             .font: textFont,
             .foregroundColor: NSColor(cgColor: textColor) ?? NSColor.white
         ]
-        let str = NSAttributedString(string: "CENTRAL STATION", attributes: attrs)
+        let str = NSAttributedString(string: "CLAUDE CENTRAL STATION", attributes: attrs)
         let line = CTLineCreateWithAttributedString(str)
         let textBounds = CTLineGetBoundsWithOptions(line, [])
         let textX = (size - textBounds.width) / 2
