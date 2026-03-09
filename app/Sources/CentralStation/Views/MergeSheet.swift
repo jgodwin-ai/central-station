@@ -10,6 +10,7 @@ struct MergeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let taskId: String
     let worktreePath: String
+    let sshHost: String?
     let onAction: (MergeAction) -> Void
 
     @State private var commitMessage = ""
@@ -73,7 +74,11 @@ struct MergeSheet: View {
     private func generateMessage() async {
         let diff: String
         do {
-            diff = try await ShellHelper.runGit(in: worktreePath, args: ["diff", "HEAD", "--stat"])
+            if let host = sshHost {
+                diff = try await RemoteShell.runGit(host: host, inDirectory: worktreePath, args: ["diff", "HEAD", "--stat"])
+            } else {
+                diff = try await ShellHelper.runGit(in: worktreePath, args: ["diff", "HEAD", "--stat"])
+            }
         } catch {
             commitMessage = "Changes from task: \(taskId)"
             isGenerating = false

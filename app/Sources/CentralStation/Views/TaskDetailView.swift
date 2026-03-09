@@ -148,7 +148,7 @@ struct TaskDetailView: View {
             }
         }
         .sheet(isPresented: $showMergeSheet) {
-            MergeSheet(taskId: task.id, worktreePath: task.worktreePath) { action in
+            MergeSheet(taskId: task.id, worktreePath: task.worktreePath, sshHost: task.sshHost) { action in
                 onMergeAction(action)
             }
         }
