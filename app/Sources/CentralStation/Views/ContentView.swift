@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var selectedTask: AppTask?
     @State private var showAddTask = false
     @State private var showHookInfo = false
+    @State private var showManageRemotes = false
     @State private var mergeError: String?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
     @Environment(\.openWindow) private var openWindow
@@ -56,6 +57,11 @@ struct ContentView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(coordinator.hooksInstalled ? Color.secondary : Color.orange)
                     Spacer()
+                    Button(action: { showManageRemotes = true }) {
+                        Label("Remotes", systemImage: "network")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                 }
                 .padding(8)
             }
@@ -139,16 +145,26 @@ struct ContentView: View {
         .sheet(isPresented: $showAddTask) {
             AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, remote, remotePath in
                 Task {
-                    try? await coordinator.addTask(
-                        id: id, description: description,
-                        prompt: prompt, permissionMode: mode,
-                        customProjectPath: customPath
-                    )
+                    if let remote, let remotePath {
+                        try? await coordinator.addRemoteTask(
+                            id: id, description: description, prompt: prompt,
+                            permissionMode: mode, remote: remote, remotePath: remotePath
+                        )
+                    } else {
+                        try? await coordinator.addTask(
+                            id: id, description: description,
+                            prompt: prompt, permissionMode: mode,
+                            customProjectPath: customPath
+                        )
+                    }
                     if let newTask = coordinator.tasks.last {
                         selectedTask = newTask
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showManageRemotes) {
+            ManageRemotesSheet(remoteStore: coordinator.remoteStore)
         }
         .sheet(isPresented: $showHookInfo) {
             HookInfoSheet(

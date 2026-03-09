@@ -95,7 +95,11 @@ struct FileDiffView: View {
 
     private func refresh() {
         Task {
-            changedFiles = await WorktreeManager.getChangedFiles(worktreePath: task.worktreePath)
+            if let host = task.sshHost {
+                changedFiles = await WorktreeManager.getChangedFilesRemote(host: host, worktreePath: task.worktreePath)
+            } else {
+                changedFiles = await WorktreeManager.getChangedFiles(worktreePath: task.worktreePath)
+            }
             if let sel = selectedFile, !changedFiles.contains(where: { $0.id == sel.id }) {
                 selectedFile = nil
                 fileDiff = nil
@@ -106,7 +110,11 @@ struct FileDiffView: View {
     private func loadFileDiff(_ file: WorktreeManager.ChangedFile) {
         isLoading = true
         Task {
-            fileDiff = await WorktreeManager.getFileDiff(worktreePath: task.worktreePath, filePath: file.path)
+            if let host = task.sshHost {
+                fileDiff = await WorktreeManager.getFileDiffRemote(host: host, worktreePath: task.worktreePath, filePath: file.path)
+            } else {
+                fileDiff = await WorktreeManager.getFileDiff(worktreePath: task.worktreePath, filePath: file.path)
+            }
             isLoading = false
         }
     }

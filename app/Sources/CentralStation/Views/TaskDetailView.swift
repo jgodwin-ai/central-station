@@ -62,16 +62,29 @@ struct TaskDetailView: View {
                             Label("Pop Out Window", systemImage: "rectangle.portrait.and.arrow.forward")
                         }
                         Divider()
-                        Button(action: {
-                            NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
-                        }) {
-                            Label("Open in Finder", systemImage: "folder")
-                        }
-                        Button(action: {
-                            let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
-                            Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
-                        }) {
-                            Label("Open in Terminal", systemImage: "terminal")
+                        if task.isRemote {
+                            Button(action: {
+                                if let host = task.sshHost {
+                                    let escapedPath = task.worktreePath.replacingOccurrences(of: "\"", with: "\\\"")
+                                    let escapedHost = host.replacingOccurrences(of: "\"", with: "\\\"")
+                                    let script = "tell application \"Terminal\" to do script \"ssh -t \(escapedHost) 'cd \(escapedPath) && exec $SHELL'\""
+                                    Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
+                                }
+                            }) {
+                                Label("SSH to Remote", systemImage: "terminal")
+                            }
+                        } else {
+                            Button(action: {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
+                            }) {
+                                Label("Open in Finder", systemImage: "folder")
+                            }
+                            Button(action: {
+                                let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
+                                Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
+                            }) {
+                                Label("Open in Terminal", systemImage: "terminal")
+                            }
                         }
                     } label: {
                         Label("Actions", systemImage: "ellipsis.circle")

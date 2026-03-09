@@ -58,6 +58,13 @@ struct TaskRow: View {
                 .foregroundStyle(task.status.color)
                 .font(.title3)
 
+            if task.isRemote {
+                Image(systemName: "network")
+                    .font(.caption2)
+                    .foregroundStyle(.blue)
+                    .help(task.remoteAlias ?? task.sshHost ?? "Remote")
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.id)
                     .font(.headline)
