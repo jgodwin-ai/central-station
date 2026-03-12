@@ -52,7 +52,7 @@ enum RemoteShell {
         }
     }
 
-    private static func shellEscape(_ str: String) -> String {
+    static func shellEscape(_ str: String) -> String {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

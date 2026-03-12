@@ -17,6 +17,7 @@ final class HookServer: @unchecked Sendable {
 
     private var listener: NWListener?
     private(set) var port: UInt16 = defaultPort
+    var secret: String = ""
     var onStop: ((String, String) -> Void)?
     var onWorking: ((String) -> Void)? // (sessionId) — Claude is actively working
     var onPermissionRequest: ((String, String) -> Void)?
@@ -101,6 +102,27 @@ final class HookServer: @unchecked Sendable {
     }
 
     private func processRequest(connection: NWConnection, raw: String, body: String) {
+        // Validate authorization if a secret is configured
+        if !secret.isEmpty {
+            var authValue = ""
+            if let headerEnd = raw.range(of: "\r\n\r\n") {
+                let headerSection = String(raw[..<headerEnd.lowerBound])
+                for line in headerSection.split(separator: "\r\n") {
+                    if line.lowercased().hasPrefix("authorization:") {
+                        authValue = String(line.dropFirst("authorization:".count)).trimmingCharacters(in: .whitespaces)
+                        break
+                    }
+                }
+            }
+            if !HookSecret.validate(header: authValue, expected: secret) {
+                let reject = "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n"
+                connection.send(content: reject.data(using: .utf8), completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+                return
+            }
+        }
+
         let response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}"
         connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
             connection.cancel()

@@ -8,6 +8,7 @@ final class TaskCoordinator {
     var projectPath: String = ""
     var poppedOutTaskIds: Set<String> = []
     private let hookServer = HookServer()
+    private var hookSecret = HookSecret.generate()
     let remoteStore = RemoteStore()
     private var sessionToTaskId: [String: String] = [:]
 
@@ -26,7 +27,7 @@ final class TaskCoordinator {
     }
 
     func installHooks() throws {
-        try TerminalLauncher.installHooks()
+        try TerminalLauncher.installHooks(secret: hookSecret)
         hooksInstalled = true
     }
 
@@ -53,15 +54,18 @@ final class TaskCoordinator {
     func saveTasks() {
         let persisted = tasks.map { $0.toPersisted() }
         guard let data = try? JSONEncoder().encode(persisted) else { return }
-        try? data.write(to: URL(fileURLWithPath: Self.persistencePath))
+        try? SecureFile.write(data, to: Self.persistencePath)
     }
 
     func loadConfig(from path: String) throws {
         let config = try ConfigLoader.load(from: path)
         self.projectPath = config.project
         for taskConfig in config.tasks {
-            guard !tasks.contains(where: { $0.id == taskConfig.id }) else { continue }
-            let task = AppTask(config: taskConfig, worktreePath: "", projectPath: self.projectPath)
+            let sanitizedId = Validation.sanitizeTaskId(taskConfig.id)
+            guard !sanitizedId.isEmpty else { continue }
+            guard !tasks.contains(where: { $0.id == sanitizedId }) else { continue }
+            let sanitizedConfig = taskConfig.withId(sanitizedId)
+            let task = AppTask(config: sanitizedConfig, worktreePath: "", projectPath: self.projectPath)
             tasks.append(task)
             sessionToTaskId[task.sessionId] = task.id
         }
@@ -73,6 +77,7 @@ final class TaskCoordinator {
 
     func start() async throws {
         try hookServer.start()
+        hookServer.secret = hookSecret
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
@@ -105,18 +110,19 @@ final class TaskCoordinator {
     }
 
     func addTask(id: String, description: String, prompt: String, permissionMode: String? = nil, customProjectPath: String? = nil, useWorktree: Bool = true) async throws {
+        let sanitizedId = Validation.sanitizeTaskId(id)
         let effectivePath = customProjectPath ?? projectPath
         try await WorktreeManager.ensureGitRepo(at: effectivePath)
         let worktreePath: String
         if useWorktree {
             worktreePath = try await WorktreeManager.createWorktree(
-                projectPath: effectivePath, taskId: id
+                projectPath: effectivePath, taskId: sanitizedId
             )
         } else {
             worktreePath = effectivePath
         }
         let task = AppTask(
-            id: id,
+            id: sanitizedId,
             description: description,
             prompt: prompt,
             worktreePath: worktreePath,
@@ -132,13 +138,14 @@ final class TaskCoordinator {
     }
 
     func addRemoteTask(id: String, description: String, prompt: String, permissionMode: String?, remote: RemoteConfig, remotePath: String) async throws {
-        try await TerminalLauncher.installHooksOnRemote(host: remote.sshHost)
+        let sanitizedId = Validation.sanitizeTaskId(id)
+        try await TerminalLauncher.installHooksOnRemote(host: remote.sshHost, secret: hookSecret)
         try await WorktreeManager.ensureGitRepoRemote(host: remote.sshHost, at: remotePath)
         let worktreePath = try await WorktreeManager.createWorktreeRemote(
-            host: remote.sshHost, projectPath: remotePath, taskId: id
+            host: remote.sshHost, projectPath: remotePath, taskId: sanitizedId
         )
         let task = AppTask(
-            id: id, description: description, prompt: prompt,
+            id: sanitizedId, description: description, prompt: prompt,
             worktreePath: worktreePath, projectPath: remotePath,
             permissionMode: permissionMode,
             remoteAlias: remote.alias, sshHost: remote.sshHost

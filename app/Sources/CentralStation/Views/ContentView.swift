@@ -24,7 +24,8 @@ struct ContentView: View {
                             .font(.caption)
                         Spacer()
                         Button("Update") {
-                            if let url = URL(string: update.url) {
+                            if Validation.isValidUpdateURL(update.url),
+                               let url = URL(string: update.url) {
                                 NSWorkspace.shared.open(url)
                             }
                         }
@@ -159,7 +160,8 @@ struct ContentView: View {
                             Task {
                                 do {
                                     let prURL = try await coordinator.handleMergeAction(task: task, action: action)
-                                    if let prURL, let url = URL(string: prURL) {
+                                    if let prURL, Validation.isValidPRURL(prURL),
+                                       let url = URL(string: prURL) {
                                         NSWorkspace.shared.open(url)
                                     }
                                 } catch {
