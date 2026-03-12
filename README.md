@@ -75,18 +75,6 @@ Central Station is a native SwiftUI macOS app. Here's how the pieces fit togethe
 
 **Remote tasks (SSH)** — Tasks can target remote machines. Central Station SSHs into the host, creates a worktree there, and launches Claude Code over the connection. A reverse SSH tunnel (`-R 19280:localhost:19280`) routes hook events back to the local dashboard, so monitoring works transparently.
 
-**Task config** — Define tasks in YAML or add them interactively:
-
-```yaml
-project: /path/to/repo
-tasks:
-  - id: auth-refactor
-    description: "Refactor auth to JWT"
-    prompt: "Refactor src/auth/ to use JWT tokens..."  # optional
-  - id: add-tests
-    description: "Add payment tests"
-```
-
 ## Disclaimer
 
 This is an independent, community project. It is **not** an official Anthropic product and is not affiliated with or endorsed by Anthropic in any way. This software is provided as-is with no warranty of any kind — use at your own risk. See [LICENSE](LICENSE) for details.
