@@ -70,7 +70,7 @@ public enum WorktreeManager {
         }
     }
 
-    public struct ChangedFile: Identifiable, Hashable {
+    public struct ChangedFile: Identifiable, Hashable, Sendable {
         public let id: String
         public let path: String
         public let status: String
