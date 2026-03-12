@@ -46,7 +46,8 @@ struct HookInfoSheet: View {
                     .font(.caption.bold())
                 VStack(alignment: .leading, spacing: 2) {
                     Label("**Stop** — notifies when Claude finishes a turn", systemImage: "pause.circle")
-                    Label("**PreToolUse** — notifies on permission requests", systemImage: "lock.shield")
+                    Label("**Notification** — catches permission prompts, idle, and questions", systemImage: "bell")
+                    Label("**PermissionRequest** — notifies on tool permission requests", systemImage: "lock.shield")
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)

@@ -29,6 +29,16 @@ enum ShellHelper {
     static func runGit(in directory: String, args: [String]) async throws -> String {
         try await run("/usr/bin/git", arguments: ["-C", directory] + args)
     }
+
+    /// Launch a process without waiting for it to finish (fire-and-forget).
+    static func launchDetached(_ command: String, arguments: [String] = []) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+    }
 }
 
 enum ShellError: LocalizedError {

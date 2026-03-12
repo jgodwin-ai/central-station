@@ -1,12 +1,12 @@
 import Foundation
 
 enum WorktreeError: LocalizedError {
-    case dirtyWorkingTree
+    case dirtyWorkingTree(String)
 
     var errorDescription: String? {
         switch self {
-        case .dirtyWorkingTree:
-            "Your project has uncommitted changes. Please commit or stash them before merging."
+        case .dirtyWorkingTree(let files):
+            "Your main branch has uncommitted changes. Please commit or stash them before merging.\n\n\(files)"
         }
     }
 }
@@ -138,7 +138,7 @@ enum WorktreeManager {
     static func mergeToMain(projectPath: String, taskId: String, message: String) async throws {
         let status = try await ShellHelper.runGit(in: projectPath, args: ["status", "--porcelain"])
         if !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw WorktreeError.dirtyWorkingTree
+            throw WorktreeError.dirtyWorkingTree(status.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         let taskBranch = "cs/\(taskId)"
         _ = try await ShellHelper.runGit(in: projectPath, args: ["merge", taskBranch, "--no-ff", "-m", "Merge \(taskBranch): \(message)"])
@@ -262,7 +262,7 @@ enum WorktreeManager {
     static func mergeToMainRemote(host: String, projectPath: String, taskId: String, message: String) async throws {
         let status = try await RemoteShell.runGit(host: host, inDirectory: projectPath, args: ["status", "--porcelain"])
         if !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw WorktreeError.dirtyWorkingTree
+            throw WorktreeError.dirtyWorkingTree(status.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         let taskBranch = "cs/\(taskId)"
         _ = try await RemoteShell.runGit(host: host, inDirectory: projectPath, args: ["merge", taskBranch, "--no-ff", "-m", "Merge \(taskBranch): \(message)"])

@@ -10,6 +10,38 @@ struct FileDiffView: View {
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
+                // Diff content (80%)
+                VStack(spacing: 0) {
+                    if let file = selectedFile {
+                        HStack {
+                            statusBadge(for: file.status)
+                            Text(file.path)
+                                .font(.system(.body, design: .monospaced).bold())
+                            Spacer()
+                        }
+                        .padding(8)
+                        .background(.bar)
+
+                        Divider()
+
+                        if isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if let diff = fileDiff {
+                            DiffView(diff: diff)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "Select a File",
+                            systemImage: "doc.text.magnifyingglass",
+                            description: Text("Choose a file from the list to view its diff")
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Divider()
+
                 // File list (20%)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
@@ -55,38 +87,6 @@ struct FileDiffView: View {
                     }
                 }
                 .frame(width: geo.size.width * 0.2)
-
-                Divider()
-
-                // Diff content (80%)
-                VStack(spacing: 0) {
-                    if let file = selectedFile {
-                        HStack {
-                            statusBadge(for: file.status)
-                            Text(file.path)
-                                .font(.system(.body, design: .monospaced).bold())
-                            Spacer()
-                        }
-                        .padding(8)
-                        .background(.bar)
-
-                        Divider()
-
-                        if isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if let diff = fileDiff {
-                            DiffView(diff: diff)
-                        }
-                    } else {
-                        ContentUnavailableView(
-                            "Select a File",
-                            systemImage: "doc.text.magnifyingglass",
-                            description: Text("Choose a file from the list to view its diff")
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }

@@ -3,6 +3,8 @@ import SwiftUI
 enum DetailTab: String, CaseIterable {
     case terminal = "Claude Code"
     case diff = "Diff"
+    case shell = "Terminal"
+    case finder = "Files"
 }
 
 struct TaskDetailView: View {
@@ -49,7 +51,7 @@ struct TaskDetailView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 340)
 
                     if activeTab == .diff {
                         Button(action: { showMergeSheet = true }) {
@@ -61,30 +63,18 @@ struct TaskDetailView: View {
                         Button(action: onPopOut) {
                             Label("Pop Out Window", systemImage: "rectangle.portrait.and.arrow.forward")
                         }
-                        Divider()
-                        if task.isRemote {
-                            Button(action: {
-                                if let host = task.sshHost {
-                                    let escapedPath = task.worktreePath.replacingOccurrences(of: "\"", with: "\\\"")
-                                    let escapedHost = host.replacingOccurrences(of: "\"", with: "\\\"")
-                                    let script = "tell application \"Terminal\" to do script \"ssh -t \(escapedHost) 'cd \(escapedPath) && exec $SHELL'\""
-                                    Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
-                                }
-                            }) {
-                                Label("SSH to Remote", systemImage: "terminal")
+                        Button(action: {
+                            if let host = task.sshHost {
+                                let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
+                                    "code", "--remote", "ssh-remote+\(host)", task.worktreePath
+                                ])
+                            } else {
+                                let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
+                                    "code", task.worktreePath
+                                ])
                             }
-                        } else {
-                            Button(action: {
-                                NSWorkspace.shared.open(URL(fileURLWithPath: task.worktreePath))
-                            }) {
-                                Label("Open in Finder", systemImage: "folder")
-                            }
-                            Button(action: {
-                                let script = "tell application \"Terminal\" to do script \"cd \(task.worktreePath.replacingOccurrences(of: "\"", with: "\\\""))\""
-                                Process.launchedProcess(launchPath: "/usr/bin/osascript", arguments: ["-e", script])
-                            }) {
-                                Label("Open in Terminal", systemImage: "terminal")
-                            }
+                        }) {
+                            Label("Open in VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                         }
                     } label: {
                         Label("Actions", systemImage: "ellipsis.circle")
@@ -144,6 +134,10 @@ struct TaskDetailView: View {
                     })
                 case .diff:
                     FileDiffView(task: task)
+                case .shell:
+                    EmbeddedShellView(task: task)
+                case .finder:
+                    EmbeddedFinderView(task: task)
                 }
             }
         }

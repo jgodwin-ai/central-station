@@ -44,8 +44,8 @@ struct PersistedTask: Codable {
     let projectPath: String
     let permissionMode: String?
     let status: TaskStatus
-    let remoteAlias: String?  // nil means local task
-    let sshHost: String?      // the SSH host for remote tasks
+    var remoteAlias: String? = nil  // nil means local task
+    var sshHost: String? = nil      // the SSH host for remote tasks
 }
 
 @Observable
