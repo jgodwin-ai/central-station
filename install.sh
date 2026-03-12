@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Claude Central Station installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/jgodwin-ai/central-station/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/jgodwin-ai/claude-central-station/main/install.sh | sh
 
 APP_NAME="Claude Central Station"
 EXECUTABLE="CentralStation"
 BUNDLE_ID="com.jgodwin-ai.claude-central-station"
-REPO="https://github.com/jgodwin-ai/central-station.git"
+REPO="https://github.com/jgodwin-ai/claude-central-station.git"
 INSTALL_DIR="/Applications"
 CLI_NAME="central-station"
 CLI_DIR="/usr/local/bin"
