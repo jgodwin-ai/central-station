@@ -239,7 +239,10 @@ final class TaskCoordinator {
     private func handlePermission(sessionId: String, toolName: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
         task.pendingPermission = toolName
+        task.status = .waitingForInput
+        task.lastMessage = "Permission needed for \(toolName)"
         task.lastActivityAt = Date()
+        saveTasks()
         Notifier.notify(taskId: task.id, description: "\(task.description) — permission needed for \(toolName)")
     }
 
@@ -249,6 +252,9 @@ final class TaskCoordinator {
         switch type {
         case "permission_prompt":
             task.pendingPermission = "permission"
+            task.status = .waitingForInput
+            task.lastMessage = "Needs permission"
+            saveTasks()
             Notifier.notify(taskId: task.id, description: "\(task.description) — needs permission")
         case "idle_prompt":
             task.status = .waitingForInput
