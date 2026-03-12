@@ -91,7 +91,7 @@ final class RemoteStore {
 
 **Step 3: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 4: Commit**
@@ -176,7 +176,7 @@ enum RemoteShell {
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -267,7 +267,7 @@ func toPersisted() -> PersistedTask {
 
 **Step 5: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 6: Commit**
@@ -414,7 +414,7 @@ static func createPRRemote(host: String, projectPath: String, taskId: String, me
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -504,7 +504,7 @@ private func shellEscape(_ str: String) -> String {
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -633,7 +633,7 @@ func deleteTask(_ task: AppTask) async {
 
 **Step 6: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 7: Commit**
@@ -805,7 +805,7 @@ struct RemoteFormView: View {
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -986,7 +986,7 @@ struct RemoteDirectoryBrowser: View {
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -1088,7 +1088,7 @@ When a remote is picked from the dropdown, automatically test the connection:
 
 **Step 7: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 8: Commit**
@@ -1207,7 +1207,7 @@ if task.isRemote {
 
 **Step 6: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 7: Commit**
@@ -1232,7 +1232,7 @@ For the commit message auto-generation (which runs `claude -p` locally on the di
 
 **Step 2: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 3: Commit**
@@ -1310,7 +1310,7 @@ try await TerminalLauncher.installHooksOnRemote(host: remote.sshHost)
 
 **Step 3: Verify it compiles**
 
-Run: `cd /Users/jgoai/central-station/app && swift build 2>&1 | tail -5`
+Run: `cd $PROJECT_ROOT/app && swift build 2>&1 | tail -5`
 Expected: Build complete
 
 **Step 4: Commit**
@@ -1330,7 +1330,7 @@ git commit -m "feat: auto-install hooks on remote machine before task launch"
 **Step 1: Build and run**
 
 ```bash
-cd /Users/jgoai/central-station/app && swift build 2>&1
+cd $PROJECT_ROOT/app && swift build 2>&1
 ```
 
 **Step 2: Manual test checklist**
