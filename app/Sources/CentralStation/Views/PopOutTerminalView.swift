@@ -42,7 +42,7 @@ struct PopOutTerminalView: View {
             }
 
             EmbeddedTerminalView(task: task, onProcessExit: {
-                task.status = .completed
+                coordinator.handleProcessExit(taskId: task.id)
             })
         }
         .navigationTitle("CS: \(task.id)")

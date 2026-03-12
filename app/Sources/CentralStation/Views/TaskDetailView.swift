@@ -12,6 +12,7 @@ struct TaskDetailView: View {
     let onPopOut: () -> Void
     let onMergeAction: (MergeAction) -> Void
     let onResume: () -> Void
+    let onProcessExit: @MainActor () -> Void
 
     @State private var activeTab: DetailTab = .terminal
     @State private var showMergeSheet = false
@@ -129,9 +130,7 @@ struct TaskDetailView: View {
             } else {
                 switch activeTab {
                 case .terminal:
-                    EmbeddedTerminalView(task: task, onProcessExit: {
-                        task.status = .completed
-                    })
+                    EmbeddedTerminalView(task: task, onProcessExit: onProcessExit)
                 case .diff:
                     FileDiffView(task: task)
                 case .shell:

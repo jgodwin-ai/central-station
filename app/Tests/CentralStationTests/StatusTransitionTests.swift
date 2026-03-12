@@ -16,8 +16,16 @@ private struct HookPayload: Decodable {
 private struct StatusHandler {
     var tasks: [AppTask]
 
+    mutating func handleProcessExit(taskId: String) {
+        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
+        task.status = .completed
+        task.lastActivityAt = Date()
+    }
+
     mutating func handleWorking(sessionId: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         if task.status != .working {
             task.pendingPermission = nil
             task.status = .working
@@ -27,6 +35,7 @@ private struct StatusHandler {
 
     mutating func handleStop(sessionId: String, message: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.pendingPermission = nil
         task.status = .waitingForInput
         task.lastMessage = message
@@ -35,6 +44,7 @@ private struct StatusHandler {
 
     mutating func handlePermission(sessionId: String, toolName: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.pendingPermission = toolName
         task.status = .waitingForInput
         task.lastMessage = "Permission needed for \(toolName)"
@@ -43,6 +53,7 @@ private struct StatusHandler {
 
     mutating func handleNotification(sessionId: String, type: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.lastActivityAt = Date()
         switch type {
         case "permission_prompt":
@@ -237,6 +248,145 @@ struct StatusTransitionTests {
 
         handler.handleWorking(sessionId: task.sessionId)
         #expect(task.status == .working)
+    }
+
+    // MARK: - Process exit tests
+
+    @Test func processExitSetsCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: task.id)
+
+        #expect(task.status == .completed)
+        #expect(task.lastActivityAt != nil)
+    }
+
+    @Test func processExitFromWaitingForInput() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .waitingForInput
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: task.id)
+
+        #expect(task.status == .completed)
+    }
+
+    @Test func processExitIgnoredForAlreadyCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .completed
+        let before = Date()
+        task.lastActivityAt = before
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: task.id)
+
+        #expect(task.status == .completed)
+        #expect(task.lastActivityAt == before)
+    }
+
+    @Test func processExitIgnoredForStopped() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .stopped
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: task.id)
+
+        #expect(task.status == .stopped)
+    }
+
+    @Test func processExitUnknownTaskIdIgnored() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: "unknown-task")
+
+        #expect(task.status == .working)
+    }
+
+    // MARK: - Race condition: hook events must not override completed/stopped
+
+    @Test func stopHookDoesNotOverrideCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        // Process exits first, marking completed
+        handler.handleProcessExit(taskId: task.id)
+        #expect(task.status == .completed)
+
+        // Late stop hook arrives — must NOT override completed
+        handler.handleStop(sessionId: task.sessionId, message: "late message")
+        #expect(task.status == .completed)
+    }
+
+    @Test func workingHookDoesNotOverrideCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .completed
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleWorking(sessionId: task.sessionId)
+
+        #expect(task.status == .completed)
+    }
+
+    @Test func permissionHookDoesNotOverrideCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .completed
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handlePermission(sessionId: task.sessionId, toolName: "Bash")
+
+        #expect(task.status == .completed)
+        #expect(task.pendingPermission == nil)
+    }
+
+    @Test func notificationHookDoesNotOverrideCompleted() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .completed
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleNotification(sessionId: task.sessionId, type: "idle_prompt")
+
+        #expect(task.status == .completed)
+    }
+
+    @Test func hooksDoNotOverrideStopped() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .stopped
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleWorking(sessionId: task.sessionId)
+        #expect(task.status == .stopped)
+
+        handler.handleStop(sessionId: task.sessionId, message: "msg")
+        #expect(task.status == .stopped)
+
+        handler.handlePermission(sessionId: task.sessionId, toolName: "Read")
+        #expect(task.status == .stopped)
+
+        handler.handleNotification(sessionId: task.sessionId, type: "permission_prompt")
+        #expect(task.status == .stopped)
+    }
+
+    @Test func fullLifecycle_working_stop_processExit() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        // Claude stops (waiting for input)
+        handler.handleStop(sessionId: task.sessionId, message: "All done!")
+        #expect(task.status == .waitingForInput)
+
+        // User exits Claude Code — process terminates
+        handler.handleProcessExit(taskId: task.id)
+        #expect(task.status == .completed)
+
+        // Late hook must not revert
+        handler.handleStop(sessionId: task.sessionId, message: "stale")
+        #expect(task.status == .completed)
     }
 }
 

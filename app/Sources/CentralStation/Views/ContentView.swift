@@ -169,6 +169,9 @@ struct ContentView: View {
                         },
                         onResume: {
                             coordinator.resumeTask(task)
+                        },
+                        onProcessExit: {
+                            coordinator.handleProcessExit(taskId: task.id)
                         }
                     )
                     .id("\(task.id)-\(task.status)")
