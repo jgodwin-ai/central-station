@@ -9,14 +9,20 @@ enum TerminalLauncher {
     static func hooksInstalled() -> Bool {
         guard let data = FileManager.default.contents(atPath: userSettingsPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let hooks = json["hooks"] as? [String: Any],
-              let stopArr = hooks["Stop"] as? [[String: Any]],
-              let first = stopArr.first,
-              let innerHooks = first["hooks"] as? [[String: Any]],
-              let command = innerHooks.first?["command"] as? String else {
+              let hooks = json["hooks"] as? [String: Any] else {
             return false
         }
-        return command.contains(":\(HookServer.defaultPort)/")
+        // Check that both Stop and PreToolUse hooks are present and point at our port
+        for key in ["Stop", "UserPromptSubmit"] {
+            guard let arr = hooks[key] as? [[String: Any]],
+                  let first = arr.first,
+                  let innerHooks = first["hooks"] as? [[String: Any]],
+                  let command = innerHooks.first?["command"] as? String,
+                  command.contains(":\(HookServer.defaultPort)/") else {
+                return false
+            }
+        }
+        return true
     }
 
     static func installHooks() throws {
@@ -35,6 +41,12 @@ enum TerminalLauncher {
         }
 
         let hooks: [String: Any] = [
+            "UserPromptSubmit": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/prompt -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                ]]
+            ]],
             "Stop": [[
                 "hooks": [[
                     "type": "command",
@@ -73,10 +85,10 @@ enum TerminalLauncher {
         ]
 
         if var existingHooks = existing["hooks"] as? [String: Any] {
+            existingHooks["UserPromptSubmit"] = hooks["UserPromptSubmit"]
             existingHooks["Stop"] = hooks["Stop"]
             existingHooks["Notification"] = hooks["Notification"]
             existingHooks["PermissionRequest"] = hooks["PermissionRequest"]
-            existingHooks.removeValue(forKey: "PreToolUse")
             existing["hooks"] = existingHooks
         } else {
             existing["hooks"] = hooks
@@ -106,6 +118,7 @@ enum TerminalLauncher {
         curl_opts = " -H 'Content-Type: application/json' -d \\"$(cat)\\" || true"
 
         hooks = {
+            'UserPromptSubmit': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/prompt' + curl_opts}]}],
             'Stop': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/stop' + curl_opts}]}],
             'Notification': [
                 {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'permission_prompt'},
@@ -116,7 +129,6 @@ enum TerminalLauncher {
         }
 
         settings.setdefault('hooks', {}).update(hooks)
-        settings['hooks'].pop('PreToolUse', None)
 
         with open(settings_path, 'w') as f:
             json.dump(settings, f, indent=2)

@@ -75,6 +75,9 @@ struct ContentView: View {
                             }
                             await coordinator.deleteTask(task)
                         }
+                    },
+                    onResume: { task in
+                        coordinator.resumeTask(task)
                     }
                 )
 
@@ -198,7 +201,7 @@ struct ContentView: View {
             coordinator.tasks.forEach { _ in }
         }
         .sheet(isPresented: $showAddTask) {
-            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, remote, remotePath in
+            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, useWorktree, remote, remotePath in
                 Task {
                     if let remote, let remotePath {
                         try? await coordinator.addRemoteTask(
@@ -209,7 +212,8 @@ struct ContentView: View {
                         try? await coordinator.addTask(
                             id: id, description: description,
                             prompt: prompt, permissionMode: mode,
-                            customProjectPath: customPath
+                            customProjectPath: customPath,
+                            useWorktree: useWorktree
                         )
                     }
                     if let newTask = coordinator.tasks.last {

@@ -1,8 +1,8 @@
 import Foundation
 import Yams
 
-enum ConfigLoader {
-    static func load(from path: String) throws -> ProjectConfig {
+public enum ConfigLoader {
+    public static func load(from path: String) throws -> ProjectConfig {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let content = try String(contentsOf: url, encoding: .utf8)
 

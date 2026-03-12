@@ -129,6 +129,12 @@ final class HookServer: @unchecked Sendable {
                     self.onStop?(sessionId, message)
                 }
             }
+        } else if firstLine.contains("/hook/prompt") {
+            if let sessionId = payload.session_id {
+                DispatchQueue.main.async {
+                    self.onWorking?(sessionId)
+                }
+            }
         } else if firstLine.contains("/hook/notification") {
             if let sessionId = payload.session_id {
                 let notifType = payload.notification_type ?? payload.hook_event_name ?? "unknown"

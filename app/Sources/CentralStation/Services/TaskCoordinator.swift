@@ -104,12 +104,17 @@ final class TaskCoordinator {
         saveTasks()
     }
 
-    func addTask(id: String, description: String, prompt: String, permissionMode: String? = nil, customProjectPath: String? = nil) async throws {
+    func addTask(id: String, description: String, prompt: String, permissionMode: String? = nil, customProjectPath: String? = nil, useWorktree: Bool = true) async throws {
         let effectivePath = customProjectPath ?? projectPath
         try await WorktreeManager.ensureGitRepo(at: effectivePath)
-        let worktreePath = try await WorktreeManager.createWorktree(
-            projectPath: effectivePath, taskId: id
-        )
+        let worktreePath: String
+        if useWorktree {
+            worktreePath = try await WorktreeManager.createWorktree(
+                projectPath: effectivePath, taskId: id
+            )
+        } else {
+            worktreePath = effectivePath
+        }
         let task = AppTask(
             id: id,
             description: description,

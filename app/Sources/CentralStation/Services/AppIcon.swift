@@ -10,6 +10,8 @@ enum AppIcon {
         // Try loading from working directory (for dev builds outside .app bundle)
         let cwd = FileManager.default.currentDirectoryPath
         for candidate in [
+            "\(cwd)/Resources/icon.png",
+            "\(cwd)/Resources/AppIcon.icns",
             "\(cwd)/app/Resources/icon.png",
             "\(cwd)/app/Resources/AppIcon.icns",
         ] {

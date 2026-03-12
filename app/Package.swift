@@ -10,15 +10,20 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-testing.git", branch: "release/6.2"),
     ],
     targets: [
+        .target(
+            name: "CentralStationCore",
+            dependencies: ["Yams"],
+            path: "Sources/CentralStationCore"
+        ),
         .executableTarget(
             name: "CentralStation",
-            dependencies: ["Yams", "SwiftTerm"],
+            dependencies: ["CentralStationCore", "SwiftTerm"],
             path: "Sources/CentralStation"
         ),
         .testTarget(
             name: "CentralStationTests",
             dependencies: [
-                "Yams",
+                "CentralStationCore",
                 .product(name: "Testing", package: "swift-testing"),
             ],
             path: "Tests/CentralStationTests"

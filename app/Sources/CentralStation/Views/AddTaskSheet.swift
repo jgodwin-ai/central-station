@@ -5,7 +5,7 @@ struct AddTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     let defaultProjectPath: String
     let remoteStore: RemoteStore
-    let onAdd: (String, String, String, String?, String?, RemoteConfig?, String?) -> Void
+    let onAdd: (String, String, String, String?, String?, Bool, RemoteConfig?, String?) -> Void
 
     @State private var description = ""
     @State private var prompt = ""
@@ -13,6 +13,7 @@ struct AddTaskSheet: View {
     @State private var customPath = ""
     @State private var isGeneratingDescription = false
 
+    @State private var useWorktree = true
     @State private var isRemote = false
     @State private var selectedRemote: RemoteConfig?
     @State private var remotePath = ""
@@ -103,6 +104,11 @@ struct AddTaskSheet: View {
                     ForEach(permissionModes, id: \.self) { mode in
                         Text(mode).tag(mode)
                     }
+                }
+
+                if !isRemote {
+                    Toggle("Create git worktree", isOn: $useWorktree)
+                        .help("When enabled, creates an isolated git worktree for this task. Disable to work directly in the project directory.")
                 }
 
                 if isRemote {
@@ -223,10 +229,10 @@ struct AddTaskSheet: View {
         guard isValid else { return }
         let mode = permissionMode == "default" ? nil : permissionMode
         if isRemote, let remote = selectedRemote {
-            onAdd(taskId, description, prompt, mode, nil, remote, remotePath)
+            onAdd(taskId, description, prompt, mode, nil, true, remote, remotePath)
         } else {
             let path = customPath.isEmpty ? nil : customPath
-            onAdd(taskId, description, prompt, mode, path, nil, nil)
+            onAdd(taskId, description, prompt, mode, path, useWorktree, nil, nil)
         }
         dismiss()
     }

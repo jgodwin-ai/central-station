@@ -6,6 +6,7 @@ struct TaskListView: View {
     let onFocus: (AppTask) -> Void
     let onStop: (AppTask) -> Void
     let onDelete: (AppTask) -> Void
+    var onResume: ((AppTask) -> Void)?
 
     private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
         var groups: [String: [AppTask]] = [:]
@@ -29,6 +30,12 @@ struct TaskListView: View {
                     ForEach(group.tasks) { task in
                         TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
                             .tag(task.id)
+                            .onTapGesture(count: 2) {
+                                selectedTask = task
+                                if task.status == .stopped {
+                                    onResume?(task)
+                                }
+                            }
                     }
                 } header: {
                     HStack(spacing: 4) {
