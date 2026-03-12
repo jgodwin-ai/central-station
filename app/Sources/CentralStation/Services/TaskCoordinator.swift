@@ -234,8 +234,17 @@ final class TaskCoordinator {
         hookServer.stop()
     }
 
+    func handleProcessExit(taskId: String) {
+        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
+        task.status = .completed
+        task.lastActivityAt = Date()
+        saveTasks()
+    }
+
     private func handleWorking(sessionId: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         if task.status != .working {
             task.pendingPermission = nil
             task.status = .working
@@ -246,6 +255,7 @@ final class TaskCoordinator {
 
     private func handleStop(sessionId: String, message: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.pendingPermission = nil
         task.status = .waitingForInput
         task.lastMessage = message
@@ -256,6 +266,7 @@ final class TaskCoordinator {
 
     private func handlePermission(sessionId: String, toolName: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.pendingPermission = toolName
         task.status = .waitingForInput
         task.lastMessage = "Permission needed for \(toolName)"
@@ -266,6 +277,7 @@ final class TaskCoordinator {
 
     private func handleNotification(sessionId: String, type: String) {
         guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
         task.lastActivityAt = Date()
         switch type {
         case "permission_prompt":
