@@ -3,9 +3,19 @@ import CoreGraphics
 
 enum AppIcon {
     static func generate() -> NSImage {
-        // Try loading the bundled icon first
+        // Try loading from app bundle Resources
         if let bundled = NSImage(contentsOfFile: Bundle.main.path(forResource: "AppIcon", ofType: "icns") ?? "") {
             return bundled
+        }
+        // Try loading from working directory (for dev builds outside .app bundle)
+        let cwd = FileManager.default.currentDirectoryPath
+        for candidate in [
+            "\(cwd)/app/Resources/icon.png",
+            "\(cwd)/app/Resources/AppIcon.icns",
+        ] {
+            if let img = NSImage(contentsOfFile: candidate) {
+                return img
+            }
         }
         return generateFallback()
     }
