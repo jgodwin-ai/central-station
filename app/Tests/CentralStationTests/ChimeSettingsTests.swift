@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import CentralStationCore
 
-@Suite("ChimeSettings")
+@Suite("ChimeSettings", .serialized)
 struct ChimeSettingsTests {
 
     // MARK: - Init
@@ -83,19 +83,16 @@ struct ChimeSettingsTests {
             .appendingPathComponent(".claude/central-station-chime.json")
 
         // Back up existing file if present
-        let backupPath = settingsPath + ".backup"
+        let backupPath = settingsPath + ".backup-\(UUID().uuidString)"
         let hadExisting = FileManager.default.fileExists(atPath: settingsPath)
         if hadExisting {
-            try? FileManager.default.copyItem(atPath: settingsPath, toPath: backupPath)
+            try? FileManager.default.moveItem(atPath: settingsPath, toPath: backupPath)
         }
 
         defer {
-            // Restore original file or remove the test artifact
+            try? FileManager.default.removeItem(atPath: settingsPath)
             if hadExisting {
-                try? FileManager.default.removeItem(atPath: settingsPath)
                 try? FileManager.default.moveItem(atPath: backupPath, toPath: settingsPath)
-            } else {
-                try? FileManager.default.removeItem(atPath: settingsPath)
             }
         }
 
@@ -119,21 +116,18 @@ struct ChimeSettingsTests {
             .appendingPathComponent(".claude/central-station-chime.json")
 
         // Back up existing file if present
-        let backupPath = settingsPath + ".backup"
+        let backupPath = settingsPath + ".backup-\(UUID().uuidString)"
         let hadExisting = FileManager.default.fileExists(atPath: settingsPath)
         if hadExisting {
-            try? FileManager.default.copyItem(atPath: settingsPath, toPath: backupPath)
+            try? FileManager.default.moveItem(atPath: settingsPath, toPath: backupPath)
         }
 
         defer {
+            try? FileManager.default.removeItem(atPath: settingsPath)
             if hadExisting {
-                try? FileManager.default.removeItem(atPath: settingsPath)
                 try? FileManager.default.moveItem(atPath: backupPath, toPath: settingsPath)
             }
         }
-
-        // Remove the file so load() hits the fallback path
-        try? FileManager.default.removeItem(atPath: settingsPath)
 
         let loaded = ChimeSettings.load()
         #expect(loaded.soundName == "Glass")
