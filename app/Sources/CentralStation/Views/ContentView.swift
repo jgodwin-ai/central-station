@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var showAddTask = false
     @State private var showHookInfo = false
     @State private var showManageRemotes = false
+    @State private var showChimeSettings = false
     @State private var mergeError: String?
     @State private var updateInfo: UpdateChecker.UpdateInfo?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
@@ -86,6 +87,12 @@ struct ContentView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(coordinator.hooksInstalled ? Color.secondary : Color.orange)
                     Spacer()
+                    Button(action: { showChimeSettings = true }) {
+                        Image(systemName: "bell.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Notification settings")
                     Button(action: { showManageRemotes = true }) {
                         Label("Remotes", systemImage: "network")
                     }
@@ -194,6 +201,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showManageRemotes) {
             ManageRemotesSheet(remoteStore: coordinator.remoteStore)
+        }
+        .sheet(isPresented: $showChimeSettings) {
+            ChimeSettingsSheet()
         }
         .sheet(isPresented: $showHookInfo) {
             HookInfoSheet(

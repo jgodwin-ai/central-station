@@ -31,5 +31,12 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         return container
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // Re-focus the terminal when switching back to this task
+        if let termView = nsView.subviews.first {
+            DispatchQueue.main.async {
+                termView.window?.makeFirstResponder(termView)
+            }
+        }
+    }
 }

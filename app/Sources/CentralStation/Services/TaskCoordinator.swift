@@ -152,7 +152,7 @@ final class TaskCoordinator {
         sessionToTaskId[task.sessionId] = task.id
         task.isResume = true
         task.startedAt = Date()
-        task.status = .working
+        task.status = .starting
         saveTasks()
     }
 
