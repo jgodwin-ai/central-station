@@ -80,6 +80,25 @@ struct ContentView: View {
 
                 Divider()
 
+                if coordinator.needsInputCount > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pause.circle.fill")
+                            .foregroundStyle(.orange)
+                        Text("\(coordinator.needsInputCount) waiting")
+                            .font(.caption)
+                        Spacer()
+                        Text("⌘↑↓")
+                            .font(.caption2.monospaced())
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    Divider()
+                }
+
                 HStack {
                     Button(action: { showHookInfo = true }) {
                         Label("Hooks", systemImage: coordinator.hooksInstalled ? "checkmark.circle" : "exclamationmark.triangle")
@@ -217,6 +236,15 @@ struct ContentView: View {
         } message: {
             Text(mergeError ?? "")
         }
+        .background {
+            // Hidden buttons for keyboard shortcuts
+            Button("") { selectNextNeedingInput(forward: true) }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+                .hidden()
+            Button("") { selectNextNeedingInput(forward: false) }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+                .hidden()
+        }
         .onAppear {
             coordinator.checkHooksInstalled()
             if let first = coordinator.tasks.first {
@@ -228,6 +256,21 @@ struct ContentView: View {
             Task {
                 updateInfo = await UpdateChecker.check()
             }
+        }
+    }
+
+    private func selectNextNeedingInput(forward: Bool) {
+        let waiting = coordinator.tasks.filter { $0.status == .waitingForInput }
+        guard !waiting.isEmpty else { return }
+
+        if let current = selectedTask,
+           let currentIdx = waiting.firstIndex(where: { $0.id == current.id }) {
+            let nextIdx = forward
+                ? waiting.index(after: currentIdx) % waiting.count
+                : (currentIdx == waiting.startIndex ? waiting.count - 1 : waiting.index(before: currentIdx))
+            selectedTask = waiting[nextIdx]
+        } else {
+            selectedTask = forward ? waiting.first : waiting.last
         }
     }
 }
