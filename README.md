@@ -1,68 +1,92 @@
 # Central Station
 
-A terminal multiplexer for running multiple [Claude Code](https://docs.anthropic.com/en/docs/claude-code) instances in parallel. Define tasks in a YAML file, and Central Station launches each one in its own Terminal.app window with an isolated git worktree — then monitors everything from a single dashboard.
+A multi-agent, multi-repo command center for Claude Code. Run multiple Claude Code instances across repos and machines, each in its own git worktree, and monitor them all from a single native macOS dashboard.
 
-## Features
+Unlike wrapper tools that simulate agents, Central Station uses **native Claude Code installations**. Every agent gets the full Claude Code harness — tool use, file editing, MCP servers, permissions — with a dashboard that shows you what's happening across all of them. A lightweight localhost hook server lets Claude Code notify the dashboard when it needs input, so you never miss a prompt.
 
-- **Parallel execution** — Run multiple Claude Code tasks simultaneously
-- **Git isolation** — Each task gets its own worktree, so changes never collide
-- **Live dashboard** — See task status, navigate between tasks, and view diffs from your terminal
-- **Hook integration** — Automatically notified when a task stops and needs input
-- **macOS notifications** — Get alerted when tasks need attention
+Remote agent development (SSH) is supported, and dev container support is in progress.
 
 ## Install
 
-```bash
-npm install
-npm run build
-npm install -g .
+Requires macOS 14+ and Swift 6.0+ (Xcode or Command Line Tools).
+
+**One-liner:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jgodwin-ai/central-station/main/install.sh | sh
 ```
 
-## Usage
+This clones the repo, builds a release binary, installs `Claude Central Station.app` to `/Applications`, and adds a `central-station` CLI command.
 
-Create a `tasks.yaml` config file:
+**From source:**
 
-```yaml
-project: /path/to/your/repo
-
-tasks:
-  - id: auth-refactor
-    description: "Refactor auth module to use JWT"
-    prompt: "Refactor the auth module in src/auth/ to use JWT tokens instead of sessions."
-
-  - id: add-tests
-    description: "Add unit tests for payment service"
-    prompt: "Write comprehensive unit tests for src/services/payment.ts."
-    permission_mode: auto  # optional: default, acceptEdits, plan, auto
+```sh
+git clone https://github.com/jgodwin-ai/claude-central-station.git
+cd claude-central-station
+scripts/build-dmg.sh 1.0.0   # produces build/Claude Central Station-1.0.0.dmg
 ```
 
-Run it:
+**Usage:**
 
-```bash
+```sh
+# Launch from anywhere
+central-station
+
+# Or with a task config
 central-station tasks.yaml
 ```
 
-## Dashboard keys
+## Architecture
 
-| Key | Action |
-|-----|--------|
-| `↑` / `k` | Navigate up |
-| `↓` / `j` | Navigate down |
-| `d` | Toggle diff viewer |
-| `f` | Focus task's terminal window |
-| `r` | Refresh diff |
-| `q` | Quit |
+Central Station is a native SwiftUI macOS app. Here's how the pieces fit together:
 
-## How it works
+```
+┌─────────────────────────────────────────────────┐
+│  Dashboard (SwiftUI)                            │
+│  ┌───────────┐ ┌─────────────────────────────┐  │
+│  │ Task List │ │ Detail: Claude | Diff |      │  │
+│  │           │ │         Terminal | Files     │  │
+│  └───────────┘ └─────────────────────────────┘  │
+└──────────────────────┬──────────────────────────┘
+                       │
+              ┌────────┴────────┐
+              │  Hook Server    │  (localhost HTTP)
+              │  :19280         │
+              └────────┬────────┘
+                       │ POST /hook/stop
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+  ┌──────────┐   ┌──────────┐   ┌──────────┐
+  │ Claude   │   │ Claude   │   │ Claude   │
+  │ Code #1  │   │ Code #2  │   │ Code #3  │
+  │ worktree │   │ worktree │   │ worktree │
+  └──────────┘   └──────────┘   └──────────┘
+```
 
-1. Reads your YAML config and creates a git worktree per task (branch `cs/{taskId}`)
-2. Opens a Terminal.app window for each task running `claude` with the given prompt
-3. Configures a hook server so each Claude Code instance reports status back
-4. Displays a live dashboard showing all task statuses
-5. When a task needs input, you get a notification and can press `f` to jump to its terminal
+**Git worktrees** — Each task gets its own worktree (`<project>/.worktrees/<task-id>`) on a dedicated branch. Agents work in isolation; merge back to main when done.
 
-## Requirements
+**Hook server** — A local HTTP server receives Claude Code `Stop` hook events. When an agent finishes a turn and is waiting for input, the hook fires a POST to the dashboard, updating task status in real time. No polling.
 
-- macOS (uses Terminal.app and AppleScript)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
-- Node.js 18+
+**Embedded terminals** — Each task has a terminal tab running the actual Claude Code session. You can also pop it out or open the worktree in VS Code.
+
+**Remote tasks (SSH)** — Tasks can target remote machines. Central Station SSHs into the host, creates a worktree there, and launches Claude Code over the connection. A reverse SSH tunnel (`-R 19280:localhost:19280`) routes hook events back to the local dashboard, so monitoring works transparently.
+
+**Task config** — Define tasks in YAML or add them interactively:
+
+```yaml
+project: /path/to/repo
+tasks:
+  - id: auth-refactor
+    description: "Refactor auth to JWT"
+    prompt: "Refactor src/auth/ to use JWT tokens..."
+  - id: add-tests
+    description: "Add payment tests"
+```
+
+## Disclaimer
+
+This is an independent, community project. It is **not** an official Anthropic product and is not affiliated with or endorsed by Anthropic in any way. This software is provided as-is with no warranty of any kind — use at your own risk. See [LICENSE](LICENSE) for details.
+
+## License
+
+[MIT](LICENSE)
