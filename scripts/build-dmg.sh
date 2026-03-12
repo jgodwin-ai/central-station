@@ -25,12 +25,15 @@ if [ ! -f "$BINARY" ]; then
 fi
 
 echo "==> Creating app bundle..."
-rm -rf "$APP_BUNDLE"
+if [ -d "$APP_BUNDLE" ]; then
+    mv "$APP_BUNDLE" "$BUILD_DIR/.old-app-bundle-$$"
+fi
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-# Copy binary
+# Copy binary and icon
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE"
+cp "$APP_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # Create Info.plist
 cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
@@ -73,8 +76,7 @@ echo "==> Creating DMG..."
 rm -f "$DMG_PATH"
 
 # Create a temporary directory for the DMG contents
-DMG_STAGING="$BUILD_DIR/dmg-staging"
-rm -rf "$DMG_STAGING"
+DMG_STAGING=$(mktemp -d -t central-station-dmg)
 mkdir -p "$DMG_STAGING"
 cp -R "$APP_BUNDLE" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
@@ -86,7 +88,10 @@ hdiutil create \
     -format UDZO \
     "$DMG_PATH"
 
-rm -rf "$DMG_STAGING"
+# Clean up staging (safe — it's a mktemp dir)
+if [[ "$DMG_STAGING" == /tmp/* || "$DMG_STAGING" == /var/folders/* ]]; then
+    rm -rf "$DMG_STAGING"
+fi
 
 echo ""
 echo "==> Done!"

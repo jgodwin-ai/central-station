@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/Resources/icon.png" width="128" alt="Central Station icon">
+</p>
+
 # Central Station
 
 A multi-agent, multi-repo command center for Claude Code. Run multiple Claude Code instances across repos and machines, each in its own git worktree, and monitor them all from a single native macOS dashboard.

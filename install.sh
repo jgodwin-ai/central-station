@@ -53,14 +53,19 @@ fi
 
 # --- Clone and build ---
 
-TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+WORK_DIR=$(mktemp -d -t central-station-install)
+cleanup() {
+    if [ -d "$WORK_DIR" ] && [[ "$WORK_DIR" == /tmp/* || "$WORK_DIR" == /var/folders/* ]]; then
+        rm -rf "$WORK_DIR"
+    fi
+}
+trap cleanup EXIT
 
 info "Cloning repository..."
-git clone --depth 1 "$REPO" "$TMPDIR/central-station" 2>&1 | tail -1
+git clone --depth 1 "$REPO" "$WORK_DIR/central-station" 2>&1 | tail -1
 
 info "Building release binary (this may take a minute)..."
-cd "$TMPDIR/central-station/app"
+cd "$WORK_DIR/central-station/app"
 swift build -c release 2>&1 | grep -E '(Building|Build complete|error:)' || true
 
 BINARY="$(swift build -c release --show-bin-path)/$EXECUTABLE"
@@ -72,14 +77,15 @@ fi
 # --- Create app bundle ---
 
 info "Creating app bundle..."
-APP_BUNDLE="$TMPDIR/$APP_NAME.app"
+APP_BUNDLE="$WORK_DIR/$APP_NAME.app"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE"
+cp "$WORK_DIR/central-station/app/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # Get version from git
-VERSION=$(cd "$TMPDIR/central-station" && git describe --tags 2>/dev/null || echo "0.1.0")
+VERSION=$(cd "$WORK_DIR/central-station" && git describe --tags 2>/dev/null || echo "0.1.0")
 
 cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -120,10 +126,10 @@ echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
 info "Installing to $INSTALL_DIR..."
 
-# Remove old version if present
+# Move old version to trash if present
 if [ -d "$INSTALL_DIR/$APP_NAME.app" ]; then
-    warn "Replacing existing installation."
-    rm -rf "$INSTALL_DIR/$APP_NAME.app"
+    warn "Moving existing installation to Trash."
+    mv "$INSTALL_DIR/$APP_NAME.app" "$HOME/.Trash/$APP_NAME.app.$(date +%s)" 2>/dev/null || true
 fi
 
 cp -R "$APP_BUNDLE" "$INSTALL_DIR/"

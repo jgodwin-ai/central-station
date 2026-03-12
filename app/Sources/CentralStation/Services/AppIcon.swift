@@ -3,6 +3,14 @@ import CoreGraphics
 
 enum AppIcon {
     static func generate() -> NSImage {
+        // Try loading the bundled icon first
+        if let bundled = NSImage(contentsOfFile: Bundle.main.path(forResource: "AppIcon", ofType: "icns") ?? "") {
+            return bundled
+        }
+        return generateFallback()
+    }
+
+    static func generateFallback() -> NSImage {
         let size: CGFloat = 512
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()

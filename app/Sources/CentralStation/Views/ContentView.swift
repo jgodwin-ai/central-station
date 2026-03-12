@@ -8,12 +8,41 @@ struct ContentView: View {
     @State private var showHookInfo = false
     @State private var showManageRemotes = false
     @State private var mergeError: String?
+    @State private var updateInfo: UpdateChecker.UpdateInfo?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
+                if let update = updateInfo {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text("v\(update.version) available")
+                            .font(.caption)
+                        Spacer()
+                        Button("Update") {
+                            if let url = URL(string: update.url) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderless)
+                        Button {
+                            updateInfo = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.blue.opacity(0.1))
+                    Divider()
+                }
+
                 Button(action: { showAddTask = true }) {
                     Label("New Task", systemImage: "plus.circle.fill")
                         .font(.headline)
@@ -185,6 +214,9 @@ struct ContentView: View {
             }
             if !coordinator.hooksInstalled {
                 showHookInfo = true
+            }
+            Task {
+                updateInfo = await UpdateChecker.check()
             }
         }
     }
