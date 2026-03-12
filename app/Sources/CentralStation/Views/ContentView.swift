@@ -127,6 +127,16 @@ struct ContentView: View {
                     Divider()
                 }
 
+                if let acct = coordinator.accountUsage {
+                    VStack(spacing: 4) {
+                        UsageBar(label: "5h", percent: acct.fiveHourPercent, resetIn: acct.fiveHourResetIn)
+                        UsageBar(label: "7d", percent: acct.sevenDayPercent, resetIn: acct.sevenDayResetIn)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    Divider()
+                }
+
                 HStack {
                     Button(action: { showHookInfo = true }) {
                         Label("Hooks", systemImage: coordinator.hooksInstalled ? "checkmark.circle" : "exclamationmark.triangle")
@@ -228,6 +238,7 @@ struct ContentView: View {
         }
         .onReceive(timer) { _ in
             coordinator.tasks.forEach { _ in }
+            Task { await coordinator.refreshUsage() }
         }
         .sheet(isPresented: $showAddTask) {
             AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, useWorktree, remote, remotePath in

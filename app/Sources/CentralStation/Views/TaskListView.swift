@@ -75,10 +75,20 @@ struct TaskRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.id)
                     .font(.headline)
-                Text(task.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(task.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let usage = task.usage, usage.totalTokens > 0 {
+                        Text(usage.formattedTokens)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                        Text(usage.formattedCost)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
 
             Spacer()

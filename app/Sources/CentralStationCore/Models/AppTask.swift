@@ -82,6 +82,7 @@ public final class AppTask: Identifiable, @unchecked Sendable {
     public var remoteAlias: String?
     public var sshHost: String?
     public var isResume: Bool = false
+    public var usage: SessionUsage?
 
     public var isRemote: Bool { sshHost != nil }
 

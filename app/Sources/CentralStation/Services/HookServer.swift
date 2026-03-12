@@ -137,12 +137,7 @@ final class HookServer: @unchecked Sendable {
 
         if firstLine.contains("/hook/stop") {
             if payload.stop_hook_active == true {
-                // Claude is in a tool use cycle — actively working
-                if let sessionId = payload.session_id {
-                    DispatchQueue.main.async {
-                        self.onWorking?(sessionId)
-                    }
-                }
+                // This stop was triggered by the hook itself — ignore to prevent loops
                 return
             }
             if let sessionId = payload.session_id {

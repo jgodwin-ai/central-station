@@ -21,6 +21,7 @@ final class TaskCoordinator {
     }
 
     var hooksInstalled: Bool = false
+    var accountUsage: AccountUsage?
 
     func checkHooksInstalled() {
         hooksInstalled = TerminalLauncher.hooksInstalled()
@@ -230,6 +231,15 @@ final class TaskCoordinator {
         saveTasks()
     }
 
+    func refreshUsage() async {
+        // Refresh per-task usage from JSONL files
+        for task in tasks where task.status != .completed {
+            task.usage = SessionUsageParser.parseForSession(sessionId: task.sessionId)
+        }
+        // Refresh account-level usage
+        accountUsage = await AccountUsageFetcher.fetch()
+    }
+
     func stop() {
         TerminalStore.shared.killAll()
         for task in tasks {
@@ -267,6 +277,8 @@ final class TaskCoordinator {
         task.status = .waitingForInput
         task.lastMessage = message
         task.lastActivityAt = Date()
+        // Refresh usage for this task
+        task.usage = SessionUsageParser.parseForSession(sessionId: sessionId)
         saveTasks()
         Notifier.notify(taskId: task.id, description: task.description)
     }

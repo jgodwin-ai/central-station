@@ -82,6 +82,12 @@ enum TerminalLauncher {
                     "type": "command",
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
+            ]],
+            "SubagentStop": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                ]]
             ]]
         ]
 
@@ -90,6 +96,7 @@ enum TerminalLauncher {
             existingHooks["Stop"] = hooks["Stop"]
             existingHooks["Notification"] = hooks["Notification"]
             existingHooks["PermissionRequest"] = hooks["PermissionRequest"]
+            existingHooks["SubagentStop"] = hooks["SubagentStop"]
             existing["hooks"] = existingHooks
         } else {
             existing["hooks"] = hooks
@@ -126,7 +133,8 @@ enum TerminalLauncher {
                 {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'idle_prompt'},
                 {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'elicitation_dialog'}
             ],
-            'PermissionRequest': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/permission' + curl_opts}]}]
+            'PermissionRequest': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/permission' + curl_opts}]}],
+            'SubagentStop': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/stop' + curl_opts}]}]
         }
 
         settings.setdefault('hooks', {}).update(hooks)

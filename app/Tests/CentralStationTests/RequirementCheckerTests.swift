@@ -116,7 +116,8 @@ struct RequirementCheckerTests {
     }
 
     @Test func commandExistsFindsRealCommand() {
-        #expect(RequirementChecker.commandExists("echo"))
+        // Use "which" itself — it's at /usr/bin/which and always findable
+        #expect(RequirementChecker.commandExists("which"))
     }
 
     @Test func commandExistsReturnsFalseForFake() {
