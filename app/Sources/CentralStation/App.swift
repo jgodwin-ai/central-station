@@ -23,7 +23,7 @@ struct CentralStationApp: App {
     }
 
     var body: some Scene {
-        Window("Claude Central Station", id: "main") {
+        Window("Central Station", id: "main") {
             Group {
                 if hasStarted {
                     ContentView(coordinator: coordinator)
@@ -39,7 +39,7 @@ struct CentralStationApp: App {
                     }
                     .padding()
                 } else {
-                    ProgressView("Starting Claude Central Station...")
+                    ProgressView("Starting Central Station...")
                         .padding()
                 }
             }
