@@ -15,6 +15,7 @@ struct CentralStationApp: App {
     @State private var coordinator = TaskCoordinator()
     @State private var errorMessage: String?
     @State private var hasStarted = false
+    @State private var recommendedWarning: String?
 
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
@@ -26,7 +27,7 @@ struct CentralStationApp: App {
         Window("Claude Central Station", id: "main") {
             Group {
                 if hasStarted {
-                    ContentView(coordinator: coordinator)
+                    ContentView(coordinator: coordinator, recommendedWarning: recommendedWarning)
                 } else if let error = errorMessage {
                     VStack(spacing: 12) {
                         Image(systemName: "exclamationmark.triangle")
@@ -67,6 +68,15 @@ struct CentralStationApp: App {
 
     private func startup() async {
         guard !hasStarted && errorMessage == nil else { return }
+
+        let requirements = RequirementChecker.check()
+        if !requirements.canStart {
+            errorMessage = RequirementChecker.formatEssentialError(requirements.missingEssential)
+            return
+        }
+        if !requirements.missingRecommended.isEmpty {
+            recommendedWarning = RequirementChecker.formatRecommendedWarning(requirements.missingRecommended)
+        }
 
         Notifier.requestPermission()
 
