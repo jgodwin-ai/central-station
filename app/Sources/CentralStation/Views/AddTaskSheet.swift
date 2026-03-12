@@ -31,9 +31,9 @@ struct AddTaskSheet: View {
 
     private var isValid: Bool {
         if isRemote {
-            return !description.isEmpty && !prompt.isEmpty && !taskId.isEmpty && selectedRemote != nil && !remotePath.isEmpty
+            return !description.isEmpty && !taskId.isEmpty && selectedRemote != nil && !remotePath.isEmpty
         }
-        return !description.isEmpty && !prompt.isEmpty && !taskId.isEmpty
+        return !description.isEmpty && !taskId.isEmpty
     }
 
     private var effectivePath: String {

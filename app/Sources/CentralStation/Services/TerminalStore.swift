@@ -37,7 +37,9 @@ final class TerminalStore {
                 if let mode = task.permissionMode {
                     remoteCmd += " --permission-mode \(mode)"
                 }
-                remoteCmd += " \(shellEscape(task.prompt))"
+                if !task.prompt.isEmpty {
+                    remoteCmd += " \(shellEscape(task.prompt))"
+                }
             }
             args.append(remoteCmd)
         } else {
@@ -51,7 +53,9 @@ final class TerminalStore {
                 if let mode = task.permissionMode {
                     args += ["--permission-mode", mode]
                 }
-                args.append(task.prompt)
+                if !task.prompt.isEmpty {
+                    args.append(task.prompt)
+                }
             }
         }
 
