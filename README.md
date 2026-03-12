@@ -78,7 +78,7 @@ project: /path/to/repo
 tasks:
   - id: auth-refactor
     description: "Refactor auth to JWT"
-    prompt: "Refactor src/auth/ to use JWT tokens..."
+    prompt: "Refactor src/auth/ to use JWT tokens..."  # optional
   - id: add-tests
     description: "Add payment tests"
 ```

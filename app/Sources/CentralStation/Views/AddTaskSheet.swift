@@ -71,8 +71,9 @@ struct AddTaskSheet: View {
 
                 VStack(alignment: .leading) {
                     HStack {
-                        Text("Prompt")
+                        Text("Prompt (optional)")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                         Spacer()
                         if !prompt.isEmpty && description.isEmpty {
                             Button("Auto-summarize") {
@@ -83,10 +84,19 @@ struct AddTaskSheet: View {
                             .disabled(isGeneratingDescription)
                         }
                     }
-                    TextEditor(text: $prompt)
-                        .font(.body)
-                        .frame(minHeight: 100)
-                        .border(Color.secondary.opacity(0.3))
+                    ZStack(alignment: .topLeading) {
+                        if prompt.isEmpty {
+                            Text("Leave blank to start an interactive session...")
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .font(.body)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                        }
+                        TextEditor(text: $prompt)
+                            .font(.body)
+                            .frame(minHeight: 100)
+                    }
+                    .border(Color.secondary.opacity(0.3))
                 }
 
                 Picker("Permission Mode", selection: $permissionMode) {
