@@ -159,6 +159,9 @@ struct AddTaskSheet: View {
                         Button("Choose...") {
                             pickFolder()
                         }
+                        Button("New Project...") {
+                            createNewProject()
+                        }
                         if !customPath.isEmpty {
                             Button("Reset") {
                                 customPath = ""
@@ -230,6 +233,31 @@ struct AddTaskSheet: View {
             return String(slug.prefix(maxLen)).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
         }
         return slug
+    }
+
+    private func createNewProject() {
+        let panel = NSSavePanel()
+        panel.title = "Create New Project"
+        panel.message = "Choose a location and name for the new project"
+        panel.nameFieldLabel = "Project Name:"
+        panel.nameFieldStringValue = "my-project"
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            let fm = FileManager.default
+            do {
+                try fm.createDirectory(at: url, withIntermediateDirectories: true)
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                process.arguments = ["init", url.path]
+                process.standardOutput = Pipe()
+                process.standardError = Pipe()
+                try process.run()
+                process.waitUntilExit()
+                customPath = url.path
+            } catch {
+                // Directory creation failed — ignore silently
+            }
+        }
     }
 
     private func pickFolder() {
