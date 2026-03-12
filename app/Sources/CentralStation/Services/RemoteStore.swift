@@ -17,7 +17,7 @@ final class RemoteStore {
 
     func save() {
         guard let data = try? JSONEncoder().encode(remotes) else { return }
-        try? data.write(to: URL(fileURLWithPath: Self.persistencePath))
+        try? SecureFile.write(data, to: Self.persistencePath)
     }
 
     func add(_ remote: RemoteConfig) {

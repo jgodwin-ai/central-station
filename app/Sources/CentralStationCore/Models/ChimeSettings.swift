@@ -33,6 +33,6 @@ public struct ChimeSettings: Codable {
 
     public func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        try? data.write(to: URL(fileURLWithPath: Self.settingsPath))
+        try? SecureFile.write(data, to: Self.settingsPath)
     }
 }

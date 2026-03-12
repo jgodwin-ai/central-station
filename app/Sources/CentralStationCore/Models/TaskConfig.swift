@@ -10,6 +10,11 @@ public struct TaskConfig: Codable, Identifiable {
         case id, description, prompt
         case permissionMode = "permission_mode"
     }
+
+    /// Create a copy with a replacement id.
+    public func withId(_ newId: String) -> TaskConfig {
+        TaskConfig(id: newId, description: description, prompt: prompt, permissionMode: permissionMode)
+    }
 }
 
 public struct ProjectConfig: Codable {

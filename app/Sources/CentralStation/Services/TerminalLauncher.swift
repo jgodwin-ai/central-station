@@ -25,7 +25,7 @@ enum TerminalLauncher {
         return true
     }
 
-    static func installHooks() throws {
+    static func installHooks(secret: String) throws {
         let port = HookServer.defaultPort
         let claudeDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude")
         let fm = FileManager.default
@@ -40,38 +40,39 @@ enum TerminalLauncher {
             existing = json
         }
 
+        let authHeader = "-H 'Authorization: Bearer \(secret)'"
         let hooks: [String: Any] = [
             "UserPromptSubmit": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/prompt -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/prompt -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
             ]],
             "Stop": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
             ]],
             "Notification": [
                 [
                     "hooks": [[
                         "type": "command",
-                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                     ]],
                     "matcher": "permission_prompt"
                 ],
                 [
                     "hooks": [[
                         "type": "command",
-                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                     ]],
                     "matcher": "idle_prompt"
                 ],
                 [
                     "hooks": [[
                         "type": "command",
-                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                        "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/notification -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                     ]],
                     "matcher": "elicitation_dialog"
                 ]
@@ -79,7 +80,7 @@ enum TerminalLauncher {
             "PermissionRequest": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/permission -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
             ]]
         ]
@@ -98,7 +99,7 @@ enum TerminalLauncher {
         try data.write(to: URL(fileURLWithPath: userSettingsPath))
     }
 
-    static func installHooksOnRemote(host: String) async throws {
+    static func installHooksOnRemote(host: String, secret: String) async throws {
         let port = HookServer.defaultPort
 
         _ = try await RemoteShell.run(host: host, command: "mkdir -p $HOME/.claude")
@@ -115,7 +116,7 @@ enum TerminalLauncher {
             settings = {}
 
         curl_base = 'curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)'
-        curl_opts = " -H 'Content-Type: application/json' -d \\"$(cat)\\" || true"
+        curl_opts = " -H 'Content-Type: application/json' -H 'Authorization: Bearer \(secret)' -d \\"$(cat)\\" || true"
 
         hooks = {
             'UserPromptSubmit': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/prompt' + curl_opts}]}],

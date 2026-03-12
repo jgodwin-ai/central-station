@@ -38,7 +38,7 @@ extension WorktreeManager {
         let worktreePath = worktreesDir + "/" + taskId
         let branchName = "cs/\(taskId)"
 
-        _ = try? await RemoteShell.run(host: host, command: "mkdir -p '\(worktreesDir)'")
+        _ = try? await RemoteShell.run(host: host, command: "mkdir -p \(RemoteShell.shellEscape(worktreesDir))")
 
         if try await RemoteShell.pathExists(host: host, path: worktreePath) {
             return worktreePath
