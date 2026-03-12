@@ -85,6 +85,7 @@ public final class AppTask: Identifiable, @unchecked Sendable {
     public var usage: SessionUsage?
 
     public var isRemote: Bool { sshHost != nil }
+    public var hasWorktree: Bool { worktreePath != projectPath }
 
     public var elapsed: String {
         guard let startedAt else { return "--" }

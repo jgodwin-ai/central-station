@@ -207,11 +207,14 @@ final class TaskCoordinator {
             var prURL: String?
             switch action {
             case .mergeToMain:
-                try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
+                if task.hasWorktree {
+                    try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
+                }
+                // No worktree = already on main, commit is enough
             case .createBranch:
-                try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
+                try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id, hasWorktree: task.hasWorktree)
             case .createPR:
-                prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message)
+                prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message, hasWorktree: task.hasWorktree)
             }
             task.status = .completed
             saveTasks()
