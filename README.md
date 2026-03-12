@@ -17,7 +17,7 @@ Requires macOS 14+ and Swift 6.0+ (Xcode or Command Line Tools).
 **One-liner:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jgodwin-ai/claude-central-station/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/jgodwin-ai/central-station/main/install.sh | sh
 ```
 
 This clones the repo, builds a release binary, installs `Claude Central Station.app` to `/Applications`, and adds a `central-station` CLI command.
@@ -25,8 +25,8 @@ This clones the repo, builds a release binary, installs `Claude Central Station.
 **From source:**
 
 ```sh
-git clone https://github.com/jgodwin-ai/claude-central-station.git
-cd claude-central-station
+git clone https://github.com/jgodwin-ai/central-station.git
+cd central-station
 scripts/build-dmg.sh 1.0.0   # produces build/Claude Central Station-1.0.0.dmg
 ```
 

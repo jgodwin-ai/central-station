@@ -2,7 +2,7 @@ import Foundation
 
 enum UpdateChecker {
     static let currentVersion = "0.1.0"
-    private static let releasesURL = "https://api.github.com/repos/jgodwin-ai/claude-central-station/releases/latest"
+    private static let releasesURL = "https://api.github.com/repos/jgodwin-ai/central-station/releases/latest"
 
     struct Release: Decodable {
         let tag_name: String
