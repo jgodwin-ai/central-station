@@ -311,10 +311,12 @@ final class TaskCoordinator {
         case "idle_prompt":
             task.status = .waitingForInput
             task.lastMessage = "Claude is idle"
+            saveTasks()
             Notifier.notify(taskId: task.id, description: "\(task.description) — idle")
         case "elicitation_dialog":
             task.status = .waitingForInput
             task.lastMessage = "Claude is asking a question"
+            saveTasks()
             Notifier.notify(taskId: task.id, description: "\(task.description) — asking a question")
         default:
             break

@@ -12,8 +12,8 @@ enum TerminalLauncher {
               let hooks = json["hooks"] as? [String: Any] else {
             return false
         }
-        // Check that both Stop and PreToolUse hooks are present and point at our port
-        for key in ["Stop", "UserPromptSubmit"] {
+        // Check that all required hooks are present and point at our port
+        for key in ["Stop", "UserPromptSubmit", "Notification", "PermissionRequest", "SubagentStop"] {
             guard let arr = hooks[key] as? [[String: Any]],
                   let first = arr.first,
                   let innerHooks = first["hooks"] as? [[String: Any]],
@@ -86,7 +86,7 @@ enum TerminalLauncher {
             "SubagentStop": [[
                 "hooks": [[
                     "type": "command",
-                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' -d \"$(cat)\" || true"
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
             ]]
         ]
