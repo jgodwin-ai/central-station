@@ -18,6 +18,7 @@ final class HookServer: @unchecked Sendable {
     private var listener: NWListener?
     private(set) var port: UInt16 = defaultPort
     var onStop: ((String, String) -> Void)?
+    var onWorking: ((String) -> Void)? // (sessionId) — Claude is actively working
     var onPermissionRequest: ((String, String) -> Void)?
     var onNotification: ((String, String) -> Void)? // (sessionId, notificationType)
 
@@ -113,7 +114,15 @@ final class HookServer: @unchecked Sendable {
         }
 
         if firstLine.contains("/hook/stop") {
-            if payload.stop_hook_active == true { return }
+            if payload.stop_hook_active == true {
+                // Claude is in a tool use cycle — actively working
+                if let sessionId = payload.session_id {
+                    DispatchQueue.main.async {
+                        self.onWorking?(sessionId)
+                    }
+                }
+                return
+            }
             if let sessionId = payload.session_id {
                 let message = payload.last_assistant_message ?? ""
                 DispatchQueue.main.async {

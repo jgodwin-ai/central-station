@@ -76,6 +76,9 @@ final class TaskCoordinator {
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
+        hookServer.onWorking = { [weak self] sessionId in
+            self?.handleWorking(sessionId: sessionId)
+        }
         hookServer.onPermissionRequest = { [weak self] sessionId, toolName in
             self?.handlePermission(sessionId: sessionId, toolName: toolName)
         }
@@ -224,6 +227,16 @@ final class TaskCoordinator {
         }
         saveTasks()
         hookServer.stop()
+    }
+
+    private func handleWorking(sessionId: String) {
+        guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        if task.status != .working {
+            task.pendingPermission = nil
+            task.status = .working
+            task.lastActivityAt = Date()
+            saveTasks()
+        }
     }
 
     private func handleStop(sessionId: String, message: String) {
