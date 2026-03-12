@@ -64,6 +64,13 @@ struct TaskDetailView: View {
                         Button(action: onPopOut) {
                             Label("Pop Out Window", systemImage: "rectangle.portrait.and.arrow.forward")
                         }
+                        if !task.isRemote {
+                            Button(action: {
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
+                            }) {
+                                Label("Reveal in Finder", systemImage: "folder")
+                            }
+                        }
                         Button(action: {
                             if let host = task.sshHost {
                                 let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
