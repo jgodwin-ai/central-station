@@ -23,19 +23,19 @@ struct TaskListView: View {
     var body: some View {
         List(selection: Binding(
             get: { selectedTask?.id },
-            set: { id in selectedTask = tasks.first { $0.id == id } }
+            set: { id in
+                selectedTask = tasks.first { $0.id == id }
+                // Auto-resume stopped tasks when selected
+                if let task = selectedTask, task.status == .stopped {
+                    onResume?(task)
+                }
+            }
         )) {
             ForEach(groupedTasks, id: \.directory) { group in
                 Section {
                     ForEach(group.tasks) { task in
                         TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
                             .tag(task.id)
-                            .onTapGesture(count: 2) {
-                                selectedTask = task
-                                if task.status == .stopped {
-                                    onResume?(task)
-                                }
-                            }
                     }
                 } header: {
                     HStack(spacing: 4) {

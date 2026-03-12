@@ -3,11 +3,13 @@ import AppKit
 
 struct ContentView: View {
     @State var coordinator: TaskCoordinator
+    var recommendedWarning: String?
     @State private var selectedTask: AppTask?
     @State private var showAddTask = false
     @State private var showHookInfo = false
     @State private var showManageRemotes = false
     @State private var showChimeSettings = false
+    @State private var showRecommendedWarning = true
     @State private var mergeError: String?
     @State private var updateInfo: UpdateChecker.UpdateInfo?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
@@ -41,6 +43,28 @@ struct ContentView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.blue.opacity(0.1))
+                    Divider()
+                }
+
+                if let warning = recommendedWarning, showRecommendedWarning {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(warning)
+                            .font(.caption)
+                            .lineLimit(3)
+                        Spacer()
+                        Button {
+                            showRecommendedWarning = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.orange.opacity(0.1))
                     Divider()
                 }
 
