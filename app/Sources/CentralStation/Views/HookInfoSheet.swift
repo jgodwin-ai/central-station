@@ -21,6 +21,12 @@ struct HookInfoSheet: View {
                 }
                 Text("Hook server running on port \(port). Claude Code sessions will report status changes and permission requests.")
                     .foregroundStyle(.secondary)
+
+                Button("Reinstall Hooks") {
+                    onInstall()
+                }
+                .buttonStyle(.bordered)
+                .help("Force reinstall hooks to ~/.claude/settings.json")
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
