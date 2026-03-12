@@ -10,6 +10,32 @@ Unlike wrapper tools that simulate agents, Central Station uses **native Claude 
 
 Remote agent development (SSH) is supported, and dev container support is in progress.
 
+<p align="center">
+  <img src="central_station.png" alt="Central Station dashboard" width="800">
+</p>
+
+## Features
+
+### Built-in Diff Viewer
+
+Review file changes made by each agent directly in the dashboard. Every task's detail view includes a diff tab showing exactly what the agent has modified, so you can audit changes without switching to a separate tool.
+
+### Embedded Terminal
+
+Each task includes a fully interactive terminal running the actual Claude Code session. Watch agents work in real time, respond to prompts, or take over manually — all without leaving the dashboard.
+
+### File Browser
+
+Browse the worktree file tree for any task from the Files tab. Quickly inspect the current state of files an agent is working on without navigating to the directory yourself.
+
+### VS Code Launcher
+
+Open any task's worktree directly in VS Code with a single click. Jump from monitoring in the dashboard to hands-on editing when you need to intervene or continue work manually.
+
+### Cost Tracking
+
+Monitor API spend per task and across all running agents. The dashboard tracks token usage and cost in real time, so you always know what your fleet of agents is costing you.
+
 ## Install
 
 Requires macOS 14+ and Swift 6.0+ (Xcode or Command Line Tools).
