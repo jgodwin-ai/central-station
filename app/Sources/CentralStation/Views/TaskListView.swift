@@ -126,6 +126,13 @@ struct TaskRow: View {
         .padding(.vertical, 4)
         .contextMenu {
             Button("Focus Terminal") { onFocus() }
+            if !task.isRemote {
+                Button(action: {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
+                }) {
+                    Text("Reveal in Finder")
+                }
+            }
             if task.status != .completed {
                 Divider()
                 Button("Stop Task", role: .destructive) { onStop() }
