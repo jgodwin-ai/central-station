@@ -23,6 +23,11 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             termView.topAnchor.constraint(equalTo: container.topAnchor),
             termView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
+
+        // Auto-focus the terminal
+        DispatchQueue.main.async {
+            termView.window?.makeFirstResponder(termView)
+        }
         return container
     }
 

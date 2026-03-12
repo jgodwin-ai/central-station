@@ -175,24 +175,25 @@ struct AddTaskSheet: View {
 
             HStack {
                 Spacer()
+                Text("⇧↩ to launch")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("Launch") {
-                    let mode = permissionMode == "default" ? nil : permissionMode
-                    if isRemote, let remote = selectedRemote {
-                        onAdd(taskId, description, prompt, mode, nil, remote, remotePath)
-                    } else {
-                        let path = customPath.isEmpty ? nil : customPath
-                        onAdd(taskId, description, prompt, mode, path, nil, nil)
-                    }
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!isValid)
+                Button("Launch") { launchTask() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!isValid)
             }
         }
         .padding()
         .frame(width: 520, height: isRemote ? 640 : 440)
+        .onKeyPress(.return, phases: .down) { press in
+            if press.modifiers.contains(.shift) && isValid {
+                launchTask()
+                return .handled
+            }
+            return .ignored
+        }
         .onChange(of: prompt) {
             if description.isEmpty && !prompt.isEmpty && prompt.count > 20 {
                 generateDescription()
@@ -216,6 +217,18 @@ struct AddTaskSheet: View {
         .sheet(isPresented: $showManageRemotes) {
             ManageRemotesSheet(remoteStore: remoteStore)
         }
+    }
+
+    private func launchTask() {
+        guard isValid else { return }
+        let mode = permissionMode == "default" ? nil : permissionMode
+        if isRemote, let remote = selectedRemote {
+            onAdd(taskId, description, prompt, mode, nil, remote, remotePath)
+        } else {
+            let path = customPath.isEmpty ? nil : customPath
+            onAdd(taskId, description, prompt, mode, path, nil, nil)
+        }
+        dismiss()
     }
 
     private func slugify(_ text: String) -> String {
