@@ -43,20 +43,23 @@ final class TerminalStore {
             }
             args.append(remoteCmd)
         } else {
-            // Local task: launch claude directly
+            // Local task: launch claude via login shell to inherit full PATH from user's zsh profile
+            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            executable = shell
             let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
-            executable = claudePath
+            var claudeCmd = shellEscape(claudePath)
             if task.isResume {
-                args = ["--continue"]
+                claudeCmd += " --continue"
             } else {
-                args = ["--session-id", task.sessionId]
+                claudeCmd += " --session-id \(task.sessionId)"
                 if let mode = task.permissionMode {
-                    args += ["--permission-mode", mode]
+                    claudeCmd += " --permission-mode \(mode)"
                 }
                 if !task.prompt.isEmpty {
-                    args.append(task.prompt)
+                    claudeCmd += " \(shellEscape(task.prompt))"
                 }
             }
+            args = ["-l", "-c", "exec \(claudeCmd)"]
         }
 
         let delegate = ProcessDelegate(onProcessExit: onProcessExit)
