@@ -10,15 +10,7 @@ struct TaskListView: View {
     var onAddTaskForRepo: ((String) -> Void)?
 
     private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
-        var groups: [String: [AppTask]] = [:]
-        for task in tasks {
-            let dir = task.projectPath
-            groups[dir, default: []].append(task)
-        }
-        return groups.sorted { $0.key < $1.key }.map { dir, tasks in
-            let label = (dir as NSString).lastPathComponent
-            return (directory: dir, label: label, tasks: tasks)
-        }
+        AppTask.groupByRepo(tasks)
     }
 
     var body: some View {

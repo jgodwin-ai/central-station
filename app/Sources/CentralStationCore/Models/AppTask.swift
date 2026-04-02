@@ -131,6 +131,17 @@ public final class AppTask: Identifiable, @unchecked Sendable {
         self.isResume = true
     }
 
+    public static func groupByRepo(_ tasks: [AppTask]) -> [(directory: String, label: String, tasks: [AppTask])] {
+        var groups: [String: [AppTask]] = [:]
+        for task in tasks {
+            groups[task.projectPath, default: []].append(task)
+        }
+        return groups.sorted { $0.key < $1.key }.map { dir, tasks in
+            let label = (dir as NSString).lastPathComponent
+            return (directory: dir, label: label, tasks: tasks)
+        }
+    }
+
     public func toPersisted() -> PersistedTask {
         PersistedTask(
             id: id, description: description, prompt: prompt,

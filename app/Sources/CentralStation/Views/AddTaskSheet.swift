@@ -11,7 +11,7 @@ struct AddTaskSheet: View {
     @State private var description = ""
     @State private var prompt = ""
     @State private var permissionMode = "default"
-    @State private var customPath = ""
+    @State private var customPath: String
     @State private var isGeneratingDescription = false
 
     @State private var useWorktree = true
@@ -20,6 +20,14 @@ struct AddTaskSheet: View {
     @State private var remotePath = ""
     @State private var connectionStatus: ConnectionStatus = .untested
     @State private var showManageRemotes = false
+
+    init(defaultProjectPath: String, remoteStore: RemoteStore, onAdd: @escaping (String, String, String, String?, String?, Bool, RemoteConfig?, String?) -> Void, initialCustomPath: String? = nil) {
+        self.defaultProjectPath = defaultProjectPath
+        self.remoteStore = remoteStore
+        self.onAdd = onAdd
+        self.initialCustomPath = initialCustomPath
+        _customPath = State(initialValue: initialCustomPath ?? "")
+    }
 
     enum ConnectionStatus {
         case untested, testing, success(String), failed(String)
@@ -223,11 +231,6 @@ struct AddTaskSheet: View {
         }
         .sheet(isPresented: $showManageRemotes) {
             ManageRemotesSheet(remoteStore: remoteStore)
-        }
-        .onAppear {
-            if let path = initialCustomPath {
-                customPath = path
-            }
         }
     }
 
