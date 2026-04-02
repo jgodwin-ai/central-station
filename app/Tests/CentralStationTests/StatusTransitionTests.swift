@@ -18,7 +18,8 @@ private struct StatusHandler {
 
     mutating func handleProcessExit(taskId: String) {
         guard let task = tasks.first(where: { $0.id == taskId }) else { return }
-        guard task.status != .completed && task.status != .stopped else { return }
+        // Also ignore .starting — the old process is dying after a resume
+        guard task.status != .completed && task.status != .stopped && task.status != .starting else { return }
         task.status = .completed
         task.lastActivityAt = Date()
     }
@@ -294,6 +295,38 @@ struct StatusTransitionTests {
         handler.handleProcessExit(taskId: task.id)
 
         #expect(task.status == .stopped)
+    }
+
+    @Test func processExitIgnoredForStarting() {
+        // Race condition: old process dies after resumeTask sets .starting
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .starting
+        var handler = StatusHandler(tasks: [task])
+
+        handler.handleProcessExit(taskId: task.id)
+
+        #expect(task.status == .starting)
+    }
+
+    @Test func resumeRaceCondition_oldProcessExitDoesNotBlockHooks() {
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        // Simulate resume: kill old process, set starting
+        handler.resumeTask(task)
+        #expect(task.status == .starting)
+
+        // Old process dies — must NOT mark completed
+        handler.handleProcessExit(taskId: task.id)
+        #expect(task.status == .starting)
+
+        // New process fires hooks — must still work
+        handler.handleWorking(sessionId: task.sessionId)
+        #expect(task.status == .working)
+
+        handler.handleStop(sessionId: task.sessionId, message: "Done")
+        #expect(task.status == .waitingForInput)
     }
 
     @Test func processExitUnknownTaskIdIgnored() {

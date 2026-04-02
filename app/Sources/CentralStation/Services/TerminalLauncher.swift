@@ -6,6 +6,24 @@ enum TerminalLauncher {
             .appendingPathComponent(".claude/settings.json")
     }
 
+    /// Extracts the Bearer secret from an already-installed hook command, if present.
+    static func installedSecret() -> String? {
+        guard let data = FileManager.default.contents(atPath: userSettingsPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hooks = json["hooks"] as? [String: Any],
+              let arr = hooks["Stop"] as? [[String: Any]],
+              let first = arr.first,
+              let innerHooks = first["hooks"] as? [[String: Any]],
+              let command = innerHooks.first?["command"] as? String,
+              command.contains(":\(HookServer.defaultPort)/"),
+              let range = command.range(of: "Bearer ") else {
+            return nil
+        }
+        let after = command[range.upperBound...]
+        let token = String(after.prefix(while: { $0 != "'" && $0 != "\"" && $0 != " " }))
+        return token.isEmpty ? nil : token
+    }
+
     static func hooksInstalled() -> Bool {
         guard let data = FileManager.default.contents(atPath: userSettingsPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
