@@ -8,7 +8,7 @@ final class TaskCoordinator {
     var projectPath: String = ""
     var poppedOutTaskIds: Set<String> = []
     private let hookServer = HookServer()
-    private var hookSecret = HookSecret.generate()
+    private var hookSecret = TerminalLauncher.installedSecret() ?? HookSecret.generate()
     let remoteStore = RemoteStore()
     private var sessionToTaskId: [String: String] = [:]
 
@@ -79,9 +79,6 @@ final class TaskCoordinator {
     func start() async throws {
         try hookServer.start()
         hookServer.secret = hookSecret
-        // Always re-install hooks so settings.json has the current secret
-        try TerminalLauncher.installHooks(secret: hookSecret)
-        hooksInstalled = true
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
