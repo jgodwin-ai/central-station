@@ -256,7 +256,8 @@ final class TaskCoordinator {
 
     func handleProcessExit(taskId: String) {
         guard let task = tasks.first(where: { $0.id == taskId }) else { return }
-        guard task.status != .completed && task.status != .stopped else { return }
+        // Also ignore .starting — the old process is dying after a resume
+        guard task.status != .completed && task.status != .stopped && task.status != .starting else { return }
         task.status = .completed
         task.lastActivityAt = Date()
         saveTasks()
