@@ -6,6 +6,7 @@ struct AddTaskSheet: View {
     let defaultProjectPath: String
     let remoteStore: RemoteStore
     let onAdd: (String, String, String, String?, String?, Bool, RemoteConfig?, String?) -> Void
+    var initialCustomPath: String?
 
     @State private var description = ""
     @State private var prompt = ""
@@ -222,6 +223,11 @@ struct AddTaskSheet: View {
         }
         .sheet(isPresented: $showManageRemotes) {
             ManageRemotesSheet(remoteStore: remoteStore)
+        }
+        .onAppear {
+            if let path = initialCustomPath {
+                customPath = path
+            }
         }
     }
 
