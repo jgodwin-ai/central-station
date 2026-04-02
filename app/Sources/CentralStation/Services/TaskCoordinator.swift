@@ -79,6 +79,9 @@ final class TaskCoordinator {
     func start() async throws {
         try hookServer.start()
         hookServer.secret = hookSecret
+        // Always re-install hooks so settings.json has the current secret
+        try TerminalLauncher.installHooks(secret: hookSecret)
+        hooksInstalled = true
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
