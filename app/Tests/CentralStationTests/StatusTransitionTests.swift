@@ -87,7 +87,7 @@ private func makeTask(sessionId: String, status: TaskStatus = .pending) -> AppTa
 /// Builds CLI args matching TerminalStore logic
 private func buildClaudeArgs(task: AppTask) -> [String] {
     if task.isResume {
-        return ["--continue"]
+        return ["--resume", task.sessionId]
     } else {
         var args = ["--session-id", task.sessionId]
         if let mode = task.permissionMode {
@@ -102,7 +102,7 @@ private func buildClaudeArgs(task: AppTask) -> [String] {
 
 private func buildRemoteCommand(task: AppTask) -> String {
     if task.isResume {
-        return "cd '\(task.worktreePath)' && claude --continue"
+        return "cd '\(task.worktreePath)' && claude --resume \(task.sessionId)"
     } else {
         var cmd = "cd '\(task.worktreePath)' && claude --session-id \(task.sessionId)"
         if let mode = task.permissionMode {
@@ -406,13 +406,13 @@ struct ResumeTests {
         #expect(task.isResume == true)
     }
 
-    @Test func resumeUsesContinueFlag() {
+    @Test func resumeUsesResumeFlag() {
         let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.isResume = true
 
         let args = buildClaudeArgs(task: task)
 
-        #expect(args == ["--continue"])
+        #expect(args == ["--resume", task.sessionId])
     }
 
     @Test func newTaskUsesSessionId() {
@@ -433,13 +433,13 @@ struct ResumeTests {
         #expect(args == ["--session-id", task.sessionId, "--permission-mode", "auto", "do stuff"])
     }
 
-    @Test func remoteResumeUsesContinue() {
+    @Test func remoteResumeUsesResumeFlag() {
         let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/home/user/wt", projectPath: "/home/user/proj", sshHost: "user@host")
         task.isResume = true
 
         let cmd = buildRemoteCommand(task: task)
 
-        #expect(cmd == "cd '/home/user/wt' && claude --continue")
+        #expect(cmd == "cd '/home/user/wt' && claude --resume \(task.sessionId)")
     }
 
     @Test func remoteNewTaskUsesSessionId() {
@@ -450,7 +450,7 @@ struct ResumeTests {
 
         #expect(cmd.contains("--session-id \(task.sessionId)"))
         #expect(cmd.contains("'do stuff'"))
-        #expect(!cmd.contains("--continue"))
+        #expect(!cmd.contains("--resume"))
     }
 }
 

@@ -31,7 +31,7 @@ final class TerminalStore {
             ]
             var remoteCmd: String
             if task.isResume {
-                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --continue"
+                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --resume \(task.sessionId)"
             } else {
                 remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --session-id \(task.sessionId)"
                 if let mode = task.permissionMode {
@@ -49,7 +49,7 @@ final class TerminalStore {
             let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
             var claudeCmd = shellEscape(claudePath)
             if task.isResume {
-                claudeCmd += " --continue"
+                claudeCmd += " --resume \(task.sessionId)"
             } else {
                 claudeCmd += " --session-id \(task.sessionId)"
                 if let mode = task.permissionMode {
