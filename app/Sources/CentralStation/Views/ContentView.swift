@@ -6,6 +6,7 @@ struct ContentView: View {
     var recommendedWarning: String?
     @State private var selectedTask: AppTask?
     @State private var showAddTask = false
+    @State private var addTaskProjectPath: String?
     @State private var showHookInfo = false
     @State private var showManageRemotes = false
     @State private var showChimeSettings = false
@@ -103,6 +104,10 @@ struct ContentView: View {
                     },
                     onResume: { task in
                         coordinator.resumeTask(task)
+                    },
+                    onAddTaskForRepo: { directory in
+                        addTaskProjectPath = directory
+                        showAddTask = true
                     }
                 )
 
@@ -240,8 +245,8 @@ struct ContentView: View {
             coordinator.tasks.forEach { _ in }
             Task { await coordinator.refreshUsage() }
         }
-        .sheet(isPresented: $showAddTask) {
-            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore) { id, description, prompt, mode, customPath, useWorktree, remote, remotePath in
+        .sheet(isPresented: $showAddTask, onDismiss: { addTaskProjectPath = nil }) {
+            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore, onAdd: { id, description, prompt, mode, customPath, useWorktree, remote, remotePath in
                 Task {
                     if let remote, let remotePath {
                         try? await coordinator.addRemoteTask(
@@ -260,7 +265,7 @@ struct ContentView: View {
                         selectedTask = newTask
                     }
                 }
-            }
+            }, initialCustomPath: addTaskProjectPath)
         }
         .sheet(isPresented: $showManageRemotes) {
             ManageRemotesSheet(remoteStore: coordinator.remoteStore)

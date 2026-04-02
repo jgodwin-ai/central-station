@@ -7,17 +7,10 @@ struct TaskListView: View {
     let onStop: (AppTask) -> Void
     let onDelete: (AppTask) -> Void
     var onResume: ((AppTask) -> Void)?
+    var onAddTaskForRepo: ((String) -> Void)?
 
     private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
-        var groups: [String: [AppTask]] = [:]
-        for task in tasks {
-            let dir = task.projectPath
-            groups[dir, default: []].append(task)
-        }
-        return groups.sorted { $0.key < $1.key }.map { dir, tasks in
-            let label = (dir as NSString).lastPathComponent
-            return (directory: dir, label: label, tasks: tasks)
-        }
+        AppTask.groupByRepo(tasks)
     }
 
     var body: some View {
@@ -43,6 +36,13 @@ struct TaskListView: View {
                             .font(.caption2)
                         Text(group.label)
                             .font(.caption.bold())
+                        Spacer()
+                        Button(action: { onAddTaskForRepo?(group.directory) }) {
+                            Image(systemName: "plus")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("New task in \(group.label)")
                     }
                     .foregroundStyle(.secondary)
                     .help(group.directory)
