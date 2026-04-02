@@ -7,6 +7,7 @@ struct TaskListView: View {
     let onStop: (AppTask) -> Void
     let onDelete: (AppTask) -> Void
     var onResume: ((AppTask) -> Void)?
+    var onAddTaskForRepo: ((String) -> Void)?
 
     private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
         var groups: [String: [AppTask]] = [:]
@@ -43,6 +44,13 @@ struct TaskListView: View {
                             .font(.caption2)
                         Text(group.label)
                             .font(.caption.bold())
+                        Spacer()
+                        Button(action: { onAddTaskForRepo?(group.directory) }) {
+                            Image(systemName: "plus")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("New task in \(group.label)")
                     }
                     .foregroundStyle(.secondary)
                     .help(group.directory)
