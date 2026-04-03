@@ -24,14 +24,14 @@ struct TaskDetailView: View {
                     HStack {
                         Image(systemName: task.status.icon)
                             .foregroundStyle(task.status.color)
-                        Text(task.id)
+                        Text(task.description.isEmpty ? task.id : task.description)
                             .font(.title2.bold())
                         Text("— \(task.status.rawValue)")
                             .font(.title3)
                             .foregroundStyle(task.status.color)
                     }
                     if !task.description.isEmpty {
-                        Text(task.description)
+                        Text(task.id)
                             .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 12) {

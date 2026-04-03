@@ -99,10 +99,11 @@ struct TaskRow: View {
                 .font(.title3)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(task.id)
+                Text(task.description.isEmpty ? task.id : task.description)
                     .font(.headline)
+                    .lineLimit(1)
                 HStack(spacing: 6) {
-                    Text(task.description.isEmpty ? "New task" : task.description)
+                    Text(task.id)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
