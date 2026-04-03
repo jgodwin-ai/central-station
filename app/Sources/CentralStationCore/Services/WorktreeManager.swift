@@ -17,6 +17,11 @@ public enum WorktreeManager {
             _ = try await ShellHelper.runGit(in: path, args: ["rev-parse", "--git-dir"])
         } catch {
             _ = try await ShellHelper.runGit(in: path, args: ["init"])
+        }
+        // Ensure there is at least one commit — worktree creation requires it
+        do {
+            _ = try await ShellHelper.runGit(in: path, args: ["rev-parse", "HEAD"])
+        } catch {
             _ = try await ShellHelper.runGit(in: path, args: ["commit", "--allow-empty", "-m", "initial commit"])
         }
     }

@@ -4,6 +4,10 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var coordinator: TaskCoordinator?
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         coordinator?.stop()
     }
@@ -68,6 +72,9 @@ struct CentralStationApp: App {
 
     private func startup() async {
         guard !hasStarted && errorMessage == nil else { return }
+
+        // 0. Resolve user's shell PATH (must happen before any terminal is created)
+        await Task.detached { UserShellEnv.resolve() }.value
 
         // 1. Check system requirements
         let requirements = RequirementChecker.check()

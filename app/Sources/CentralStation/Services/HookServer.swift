@@ -10,6 +10,8 @@ struct HookPayload: Decodable {
     let tool_input: [String: String]?
     let notification_type: String?
     let user_message: String?
+    let prompt: String?
+    let transcript_path: String?
 }
 
 @Observable
@@ -19,8 +21,8 @@ final class HookServer: @unchecked Sendable {
     private var listener: NWListener?
     private(set) var port: UInt16 = defaultPort
     var secret: String = ""
-    var onStop: ((String, String) -> Void)?
-    var onWorking: ((String, String?) -> Void)? // (sessionId, promptText) — Claude is actively working
+    var onStop: ((String, String, String?) -> Void)?  // (sessionId, message, transcriptPath)
+    var onWorking: ((String, String?, String?) -> Void)? // (sessionId, promptText, transcriptPath)
     var onPermissionRequest: ((String, String) -> Void)?
     var onNotification: ((String, String) -> Void)? // (sessionId, notificationType)
     var onSessionEnd: ((String) -> Void)? // (sessionId) — user exited the session
@@ -147,20 +149,21 @@ final class HookServer: @unchecked Sendable {
                 if payload.hook_event_name == "SubagentStop" {
                     // Subagent finished but main agent is still running — keep task as working
                     DispatchQueue.main.async {
-                        self.onWorking?(sessionId, nil)
+                        self.onWorking?(sessionId, nil, nil)
                     }
                 } else {
                     let message = payload.last_assistant_message ?? ""
                     DispatchQueue.main.async {
-                        self.onStop?(sessionId, message)
+                        self.onStop?(sessionId, message, payload.transcript_path)
                     }
                 }
             }
         } else if firstLine.contains("/hook/prompt") {
             if let sessionId = payload.session_id {
-                let promptText = payload.user_message
+                let promptText = payload.prompt ?? payload.user_message
+                let transcriptPath = payload.transcript_path
                 DispatchQueue.main.async {
-                    self.onWorking?(sessionId, promptText)
+                    self.onWorking?(sessionId, promptText, transcriptPath)
                 }
             }
         } else if firstLine.contains("/hook/notification") {

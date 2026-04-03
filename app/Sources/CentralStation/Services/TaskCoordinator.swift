@@ -81,13 +81,23 @@ final class TaskCoordinator {
     func start() async throws {
         try hookServer.start()
         hookServer.secret = hookSecret
-        hookServer.onStop = { [weak self] sessionId, message in
+        hookServer.onStop = { [weak self] sessionId, message, transcriptPath in
             self?.handleStop(sessionId: sessionId, message: message)
+            // Summarize from transcript on Stop — UserPromptSubmit doesn't fire for embedded terminals
+            if let transcriptPath,
+               let taskId = self?.sessionToTaskId[sessionId] {
+                self?.summarizeFromTranscript(taskId: taskId, transcriptPath: transcriptPath)
+            }
         }
-        hookServer.onWorking = { [weak self] sessionId, promptText in
+        hookServer.onWorking = { [weak self] sessionId, promptText, transcriptPath in
             self?.handleWorking(sessionId: sessionId)
-            if let promptText, let taskId = self?.sessionToTaskId[sessionId] {
-                self?.summarizeFirstPrompt(taskId: taskId, promptText: promptText)
+            if let taskId = self?.sessionToTaskId[sessionId] {
+                // Try prompt text from hook payload first, then fall back to transcript
+                if let promptText {
+                    self?.summarizeFirstPrompt(taskId: taskId, promptText: promptText)
+                } else if let transcriptPath {
+                    self?.summarizeFromTranscript(taskId: taskId, transcriptPath: transcriptPath)
+                }
             }
         }
         hookServer.onPermissionRequest = { [weak self] sessionId, toolName in
@@ -178,11 +188,21 @@ final class TaskCoordinator {
         guard let task = tasks.first(where: { $0.id == taskId }),
               task.description.isEmpty else { return }
 
+        // Set a truncated prompt immediately so the UI updates right away
+        let words = promptText.split(separator: " ").prefix(8).joined(separator: " ")
+        let immediate = words.count > 50 ? String(words.prefix(50)) + "…" : words
+        task.description = immediate
+        saveTasks()
+
+        // Then refine with claude -p in the background
         let truncated = String(promptText.prefix(500))
         Task.detached {
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["claude", "-p", "Summarize this task in 3-5 words as a short title. Output ONLY the title, nothing else: \(truncated)"]
+            process.executableURL = URL(fileURLWithPath: UserShellEnv.claudePath)
+            process.arguments = ["-p", "--max-turns", "1", "Create a 3-5 word title that describes what this task is about. Reply with ONLY the title words, no other text.\n\nTask: \(truncated)"]
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = UserShellEnv.path
+            process.environment = env
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = FileHandle.nullDevice
@@ -195,6 +215,43 @@ final class TaskCoordinator {
                     task.description = summary
                     self.saveTasks()
                 }
+            }
+        }
+    }
+
+    func summarizeFromTranscript(taskId: String, transcriptPath: String) {
+        guard let task = tasks.first(where: { $0.id == taskId }),
+              task.description.isEmpty else { return }
+
+        Task.detached {
+            guard let data = FileManager.default.contents(atPath: transcriptPath),
+                  let content = String(data: data, encoding: .utf8) else { return }
+
+            var userPrompt: String?
+            for line in content.split(separator: "\n") {
+                guard let lineData = line.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else {
+                    continue
+                }
+                // Transcript format: {"type": "user", "message": {"role": "user", "content": "..."}}
+                guard json["type"] as? String == "user" else { continue }
+                if let message = json["message"] as? [String: Any] {
+                    if let text = message["content"] as? String {
+                        userPrompt = text
+                        break
+                    } else if let parts = message["content"] as? [[String: Any]],
+                              let textPart = parts.first(where: { $0["type"] as? String == "text" }),
+                              let text = textPart["text"] as? String {
+                        userPrompt = text
+                        break
+                    }
+                }
+            }
+
+            guard let prompt = userPrompt, !prompt.isEmpty else { return }
+            await MainActor.run {
+                guard task.description.isEmpty else { return }
+                self.summarizeFirstPrompt(taskId: taskId, promptText: prompt)
             }
         }
     }
