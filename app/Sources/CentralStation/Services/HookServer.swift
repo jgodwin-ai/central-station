@@ -9,6 +9,7 @@ struct HookPayload: Decodable {
     let tool_name: String?
     let tool_input: [String: String]?
     let notification_type: String?
+    let user_message: String?
 }
 
 @Observable
@@ -19,7 +20,7 @@ final class HookServer: @unchecked Sendable {
     private(set) var port: UInt16 = defaultPort
     var secret: String = ""
     var onStop: ((String, String) -> Void)?
-    var onWorking: ((String) -> Void)? // (sessionId) — Claude is actively working
+    var onWorking: ((String, String?) -> Void)? // (sessionId, promptText) — Claude is actively working
     var onPermissionRequest: ((String, String) -> Void)?
     var onNotification: ((String, String) -> Void)? // (sessionId, notificationType)
 
@@ -148,8 +149,9 @@ final class HookServer: @unchecked Sendable {
             }
         } else if firstLine.contains("/hook/prompt") {
             if let sessionId = payload.session_id {
+                let promptText = payload.user_message
                 DispatchQueue.main.async {
-                    self.onWorking?(sessionId)
+                    self.onWorking?(sessionId, promptText)
                 }
             }
         } else if firstLine.contains("/hook/notification") {

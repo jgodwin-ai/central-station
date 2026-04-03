@@ -84,8 +84,11 @@ final class TaskCoordinator {
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
-        hookServer.onWorking = { [weak self] sessionId in
+        hookServer.onWorking = { [weak self] sessionId, promptText in
             self?.handleWorking(sessionId: sessionId)
+            if let promptText, let taskId = self?.sessionToTaskId[sessionId] {
+                self?.summarizeFirstPrompt(taskId: taskId, promptText: promptText)
+            }
         }
         hookServer.onPermissionRequest = { [weak self] sessionId, toolName in
             self?.handlePermission(sessionId: sessionId, toolName: toolName)
