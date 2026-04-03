@@ -156,6 +156,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(coordinator.hooksInstalled ? Color.secondary : Color.orange)
+                    .help(coordinator.hooksInstalled ? "Claude Code hooks installed" : "Claude Code hooks not installed")
                     Spacer()
                     Toggle(isOn: Binding(
                         get: { coordinator.repoPersistence.requireTaskName },
@@ -164,13 +165,13 @@ struct ContentView: View {
                         Image(systemName: "tag")
                     }
                     .toggleStyle(.checkbox)
-                    .help("Require task name before creating")
+                    .help("Require task name before creating new tasks")
                     Button(action: { showChimeSettings = true }) {
                         Image(systemName: "bell.fill")
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
-                    .help("Notification settings")
+                    .help("Notification sound settings")
                 }
                 .padding(8)
             }
@@ -179,8 +180,13 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: pickRepoFolder) {
-                        Label("Add Repo", systemImage: "plus.rectangle.on.folder")
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.rectangle.on.folder")
+                            Text("Add Repo")
+                                .font(.caption)
+                        }
                     }
+                    .help("Add another git repository")
                 }
             }
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
