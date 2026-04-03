@@ -31,7 +31,7 @@ enum TerminalLauncher {
             return false
         }
         // Check that all required hooks are present and point at our port
-        for key in ["Stop", "UserPromptSubmit", "Notification", "PermissionRequest", "SubagentStop"] {
+        for key in ["Stop", "UserPromptSubmit", "Notification", "PermissionRequest", "SubagentStop", "SessionEnd"] {
             guard let arr = hooks[key] as? [[String: Any]],
                   let first = arr.first,
                   let innerHooks = first["hooks"] as? [[String: Any]],
@@ -106,6 +106,12 @@ enum TerminalLauncher {
                     "type": "command",
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
+            ]],
+            "SessionEnd": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/session-end -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
+                ]]
             ]]
         ]
 
@@ -115,6 +121,7 @@ enum TerminalLauncher {
             existingHooks["Notification"] = hooks["Notification"]
             existingHooks["PermissionRequest"] = hooks["PermissionRequest"]
             existingHooks["SubagentStop"] = hooks["SubagentStop"]
+            existingHooks["SessionEnd"] = hooks["SessionEnd"]
             existing["hooks"] = existingHooks
         } else {
             existing["hooks"] = hooks
@@ -152,7 +159,8 @@ enum TerminalLauncher {
                 {'hooks': [{'type': 'command', 'command': curl_base + '/hook/notification' + curl_opts}], 'matcher': 'elicitation_dialog'}
             ],
             'PermissionRequest': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/permission' + curl_opts}]}],
-            'SubagentStop': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/stop' + curl_opts}]}]
+            'SubagentStop': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/stop' + curl_opts}]}],
+            'SessionEnd': [{'hooks': [{'type': 'command', 'command': curl_base + '/hook/session-end' + curl_opts}]}]
         }
 
         settings.setdefault('hooks', {}).update(hooks)

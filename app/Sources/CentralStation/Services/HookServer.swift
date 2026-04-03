@@ -22,6 +22,7 @@ final class HookServer: @unchecked Sendable {
     var onWorking: ((String) -> Void)? // (sessionId) — Claude is actively working
     var onPermissionRequest: ((String, String) -> Void)?
     var onNotification: ((String, String) -> Void)? // (sessionId, notificationType)
+    var onSessionEnd: ((String) -> Void)? // (sessionId) — user exited the session
 
     func start() throws {
         let params = NWParameters.tcp
@@ -164,6 +165,12 @@ final class HookServer: @unchecked Sendable {
                 let toolName = payload.tool_name ?? "unknown"
                 DispatchQueue.main.async {
                     self.onPermissionRequest?(sessionId, toolName)
+                }
+            }
+        } else if firstLine.contains("/hook/session-end") {
+            if let sessionId = payload.session_id {
+                DispatchQueue.main.async {
+                    self.onSessionEnd?(sessionId)
                 }
             }
         }

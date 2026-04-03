@@ -27,7 +27,7 @@ struct TaskListView: View {
             ForEach(groupedTasks, id: \.directory) { group in
                 Section {
                     ForEach(group.tasks) { task in
-                        TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
+                        TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) }, onResume: { onResume?(task) })
                             .tag(task.id)
                     }
                 } header: {
@@ -58,6 +58,7 @@ struct TaskRow: View {
     let onFocus: () -> Void
     let onStop: () -> Void
     let onDelete: () -> Void
+    var onResume: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -132,6 +133,9 @@ struct TaskRow: View {
                 }) {
                     Text("Reveal in Finder")
                 }
+            }
+            if task.status == .completed {
+                Button("Resume Task") { onResume?() }
             }
             if task.status != .completed {
                 Divider()
