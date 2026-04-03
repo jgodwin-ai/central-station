@@ -553,3 +553,160 @@ struct HookPayloadTests {
         #expect(payload.stop_hook_active == nil)
     }
 }
+
+// MARK: - Hook End-to-End Tests
+
+/// Tests the full chain: payload → routing → handler → final task state.
+/// Catches composition bugs where routing and handling are individually correct
+/// but don't work together (e.g. SubagentStop routed to wrong handler).
+@Suite("Hook end-to-end")
+struct HookEndToEndTests {
+
+    /// Combined routing + handling — mirrors HookServer.processRequest → TaskCoordinator
+    private func dispatch(endpoint: String, payload: HookPayload, handler: inout StatusHandler) {
+        if endpoint == "/hook/stop" {
+            if payload.stop_hook_active == true { return }
+            guard let sessionId = payload.session_id else { return }
+            if payload.hook_event_name == "SubagentStop" {
+                handler.handleWorking(sessionId: sessionId)
+            } else {
+                handler.handleStop(sessionId: sessionId, message: payload.last_assistant_message ?? "")
+            }
+        } else if endpoint == "/hook/prompt" {
+            guard let sessionId = payload.session_id else { return }
+            handler.handleWorking(sessionId: sessionId)
+        } else if endpoint == "/hook/notification" {
+            guard let sessionId = payload.session_id else { return }
+            let notifType = payload.notification_type ?? payload.hook_event_name ?? "unknown"
+            handler.handleNotification(sessionId: sessionId, type: notifType)
+        } else if endpoint == "/hook/permission" {
+            guard let sessionId = payload.session_id else { return }
+            let toolName = payload.tool_name ?? "unknown"
+            handler.handlePermission(sessionId: sessionId, toolName: toolName)
+        }
+    }
+
+    private func makeWorkingTask() -> (AppTask, StatusHandler) {
+        let task = AppTask(id: "t1", description: "test task", prompt: "do stuff",
+                          worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        let handler = StatusHandler(tasks: [task])
+        return (task, handler)
+    }
+
+    // MARK: - Stop
+
+    @Test func stop_setsWaitingForInput() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: "Stop",
+                                   stop_hook_active: false, last_assistant_message: "All done!",
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+
+        dispatch(endpoint: "/hook/stop", payload: payload, handler: &handler)
+
+        #expect(task.status == .waitingForInput)
+        #expect(task.lastMessage == "All done!")
+        #expect(task.pendingPermission == nil)
+    }
+
+    @Test func stop_hookActive_ignored() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: "Stop",
+                                   stop_hook_active: true, last_assistant_message: "Loop",
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+
+        dispatch(endpoint: "/hook/stop", payload: payload, handler: &handler)
+
+        #expect(task.status == .working,
+                "stop_hook_active=true must be ignored to prevent loops")
+    }
+
+    // MARK: - SubagentStop
+
+    @Test func subagentStop_keepsWorking() {
+        var (task, handler) = makeWorkingTask()
+        task.lastMessage = "Running subagents..."
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: "SubagentStop",
+                                   stop_hook_active: false, last_assistant_message: "Subagent done",
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+
+        dispatch(endpoint: "/hook/stop", payload: payload, handler: &handler)
+
+        #expect(task.status == .working,
+                "SubagentStop must not flip to .waitingForInput — main agent still running")
+        #expect(task.lastMessage == "Running subagents...",
+                "SubagentStop must not overwrite lastMessage")
+        #expect(task.pendingPermission == nil)
+    }
+
+    // MARK: - UserPromptSubmit
+
+    @Test func userPromptSubmit_setsWorking() {
+        var (task, handler) = makeWorkingTask()
+        task.status = .waitingForInput
+        task.pendingPermission = "Bash"
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: "UserPromptSubmit",
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+
+        dispatch(endpoint: "/hook/prompt", payload: payload, handler: &handler)
+
+        #expect(task.status == .working)
+        #expect(task.pendingPermission == nil,
+                "UserPromptSubmit must clear pending permission")
+    }
+
+    // MARK: - Notification
+
+    @Test func notification_permissionPrompt_setsWaitingForInput() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: "permission_prompt")
+
+        dispatch(endpoint: "/hook/notification", payload: payload, handler: &handler)
+
+        #expect(task.status == .waitingForInput)
+        #expect(task.pendingPermission == "permission")
+        #expect(task.lastMessage == "Needs permission")
+    }
+
+    @Test func notification_idlePrompt_setsWaitingForInput() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: "idle_prompt")
+
+        dispatch(endpoint: "/hook/notification", payload: payload, handler: &handler)
+
+        #expect(task.status == .waitingForInput)
+        #expect(task.lastMessage == "Claude is idle")
+    }
+
+    @Test func notification_elicitationDialog_setsWaitingForInput() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: "elicitation_dialog")
+
+        dispatch(endpoint: "/hook/notification", payload: payload, handler: &handler)
+
+        #expect(task.status == .waitingForInput)
+        #expect(task.lastMessage == "Claude is asking a question")
+    }
+
+    // MARK: - PermissionRequest
+
+    @Test func permissionRequest_setsWaitingForInput() {
+        var (task, handler) = makeWorkingTask()
+        let payload = HookPayload(session_id: task.sessionId, hook_event_name: "PermissionRequest",
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: "Bash", tool_input: nil, notification_type: nil)
+
+        dispatch(endpoint: "/hook/permission", payload: payload, handler: &handler)
+
+        #expect(task.status == .waitingForInput)
+        #expect(task.pendingPermission == "Bash")
+        #expect(task.lastMessage == "Permission needed for Bash")
+    }
+}

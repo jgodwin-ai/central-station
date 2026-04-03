@@ -308,6 +308,9 @@ struct HookRoutingTests {
                 return .ignored
             }
             if let sessionId = payload.session_id {
+                if payload.hook_event_name == "SubagentStop" {
+                    return .working(sessionId: sessionId)
+                }
                 return .stop(sessionId: sessionId, message: payload.last_assistant_message ?? "")
             }
             return .ignored
@@ -505,16 +508,27 @@ struct HookRoutingTests {
 
     // MARK: - SubagentStop uses same stop endpoint
 
-    @Test func subagentStop_sameAsStop_routesCorrectly() {
-        // SubagentStop hooks POST to /hook/stop — verify the routing handles it
+    @Test func subagentStop_routesToWorking_notStop() {
+        // SubagentStop should NOT trigger waitingForInput — agent is still running
         let payload = HookPayload(session_id: "subagent-session",
-                                   hook_event_name: nil, stop_hook_active: false,
+                                   hook_event_name: "SubagentStop", stop_hook_active: false,
                                    last_assistant_message: "Subagent done",
                                    tool_name: nil, tool_input: nil, notification_type: nil)
         let secret = HookSecret.generate()
         let result = route(endpoint: "/hook/stop", payload: payload,
                           secret: secret, authHeader: "Bearer \(secret)")
-        #expect(result == .stop(sessionId: "subagent-session", message: "Subagent done"))
+        #expect(result == .working(sessionId: "subagent-session"),
+                "SubagentStop must route to .working, not .stop — the main agent is still running")
+    }
+
+    @Test func mainStop_withEventName_stillRoutesToStop() {
+        // Regular Stop with explicit hook_event_name should still trigger stop
+        let payload = HookPayload(session_id: "s1",
+                                   hook_event_name: "Stop", stop_hook_active: false,
+                                   last_assistant_message: "All done!",
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+        let result = route(endpoint: "/hook/stop", payload: payload, secret: "", authHeader: nil)
+        #expect(result == .stop(sessionId: "s1", message: "All done!"))
     }
 
     @Test func subagentStop_withoutAuth_rejected() {

@@ -135,15 +135,23 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
+        // Routing logic is mirrored in HookEndToEndTests.dispatch — update both together
         if firstLine.contains("/hook/stop") {
             if payload.stop_hook_active == true {
                 // This stop was triggered by the hook itself — ignore to prevent loops
                 return
             }
             if let sessionId = payload.session_id {
-                let message = payload.last_assistant_message ?? ""
-                DispatchQueue.main.async {
-                    self.onStop?(sessionId, message)
+                if payload.hook_event_name == "SubagentStop" {
+                    // Subagent finished but main agent is still running — keep task as working
+                    DispatchQueue.main.async {
+                        self.onWorking?(sessionId)
+                    }
+                } else {
+                    let message = payload.last_assistant_message ?? ""
+                    DispatchQueue.main.async {
+                        self.onStop?(sessionId, message)
+                    }
                 }
             }
         } else if firstLine.contains("/hook/prompt") {
