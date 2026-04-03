@@ -18,7 +18,8 @@ enum UserShellEnv {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
-        process.arguments = ["-ilc", "echo $PATH"]
+        // Login shell sources profile files; avoid -i which can hang waiting for TTY
+        process.arguments = ["-lc", "echo $PATH"]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
@@ -29,10 +30,20 @@ enum UserShellEnv {
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !resolved.isEmpty {
             path = resolved
-        } else {
-            let current = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-            let home = NSHomeDirectory()
-            path = "\(home)/.local/bin:\(home)/.bun/bin:/opt/homebrew/bin:\(current)"
+        }
+
+        // Ensure common user bin directories are on PATH even if login shell missed them
+        // (e.g. PATH additions in .zshrc/.bashrc which login-only shells skip)
+        let home = NSHomeDirectory()
+        let extraDirs = [
+            "\(home)/.local/bin",
+            "\(home)/.bun/bin",
+            "/opt/homebrew/bin",
+        ]
+        let existing = Set(path.split(separator: ":").map(String.init))
+        let missing = extraDirs.filter { !existing.contains($0) && FileManager.default.fileExists(atPath: $0) }
+        if !missing.isEmpty {
+            path = (missing + [path]).joined(separator: ":")
         }
 
         for dir in path.split(separator: ":") {
@@ -62,7 +73,9 @@ final class TerminalStore {
         termView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let cmd = "cd \(shellEscape(task.worktreePath)) && exec \(shellEscape(UserShellEnv.claudePath)) --session-id \(task.sessionId)"
+        // Use --resume if this session already exists, --session-id for new sessions
+        let sessionFlag = Self.sessionExists(task.sessionId, cwd: task.worktreePath) ? "--resume" : "--session-id"
+        let cmd = "cd \(shellEscape(task.worktreePath)) && exec \(shellEscape(UserShellEnv.claudePath)) \(sessionFlag) \(task.sessionId)"
 
         // Build environment with the resolved PATH so claude and its subprocesses find tools
         var env = ProcessInfo.processInfo.environment
@@ -83,6 +96,22 @@ final class TerminalStore {
 
         terminals[task.id] = termView
         return termView
+    }
+
+    /// Check if a session transcript already exists (meaning this is a resume, not a new session).
+    private static func sessionExists(_ sessionId: String, cwd: String) -> Bool {
+        // Claude stores transcripts in ~/.claude/projects/<escaped-cwd>/<sessionId>.jsonl
+        let projectsDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects")
+        guard let dirs = try? FileManager.default.contentsOfDirectory(atPath: projectsDir) else { return false }
+        for dir in dirs {
+            let transcript = (projectsDir as NSString)
+                .appendingPathComponent(dir)
+                .appending("/\(sessionId).jsonl")
+            if FileManager.default.fileExists(atPath: transcript) {
+                return true
+            }
+        }
+        return false
     }
 
     private func shellEscape(_ str: String) -> String {
