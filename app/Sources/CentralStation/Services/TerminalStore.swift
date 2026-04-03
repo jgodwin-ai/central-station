@@ -18,60 +18,20 @@ final class TerminalStore {
         let termView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 500))
         termView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
-        let executable: String
-        var args: [String]
-
-        if let sshHost = task.sshHost {
-            // Remote task: launch via SSH with reverse tunnel for hooks
-            executable = "/usr/bin/ssh"
-            args = [
-                "-t",
-                "-R", "\(HookServer.defaultPort):localhost:\(HookServer.defaultPort)",
-                sshHost
-            ]
-            var remoteCmd: String
-            if task.isResume {
-                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --resume \(task.sessionId)"
-            } else {
-                remoteCmd = "cd \(shellEscape(task.worktreePath)) && claude --session-id \(task.sessionId)"
-                if let mode = task.permissionMode {
-                    remoteCmd += " --permission-mode \(mode)"
-                }
-                if !task.prompt.isEmpty {
-                    remoteCmd += " \(shellEscape(task.prompt))"
-                }
-            }
-            args.append(remoteCmd)
-        } else {
-            // Local task: launch claude via login shell to inherit full PATH from user's zsh profile
-            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-            executable = shell
-            let claudePath = "\(NSHomeDirectory())/.local/bin/claude"
-            var claudeCmd = shellEscape(claudePath)
-            if task.isResume {
-                claudeCmd += " --resume \(task.sessionId)"
-            } else {
-                claudeCmd += " --session-id \(task.sessionId)"
-                if let mode = task.permissionMode {
-                    claudeCmd += " --permission-mode \(mode)"
-                }
-                if !task.prompt.isEmpty {
-                    claudeCmd += " \(shellEscape(task.prompt))"
-                }
-            }
-            args = ["-l", "-c", "exec \(claudeCmd)"]
-        }
+        // Launch claude via login shell to inherit full PATH from user's zsh profile
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let cmd = "cd \(shellEscape(task.worktreePath)) && exec claude --session-id \(task.sessionId)"
 
         let delegate = ProcessDelegate(onProcessExit: onProcessExit)
         delegates[task.id] = delegate
         termView.processDelegate = delegate
 
         termView.startProcess(
-            executable: executable,
-            args: args,
+            executable: shell,
+            args: ["-l", "-c", cmd],
             environment: nil,
-            execName: task.isRemote ? "ssh" : "claude",
-            currentDirectory: task.isRemote ? NSHomeDirectory() : task.worktreePath
+            execName: "claude",
+            currentDirectory: task.worktreePath
         )
 
         terminals[task.id] = termView

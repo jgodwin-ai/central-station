@@ -3,7 +3,6 @@ import SwiftUI
 enum DetailTab: String, CaseIterable {
     case terminal = "Claude Code"
     case diff = "Diff"
-    case shell = "Terminal"
     case finder = "Files"
 }
 
@@ -31,8 +30,17 @@ struct TaskDetailView: View {
                             .font(.title3)
                             .foregroundStyle(task.status.color)
                     }
-                    Text(task.description)
-                        .foregroundStyle(.secondary)
+                    if !task.description.isEmpty {
+                        Text(task.description)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 12) {
+                        Label("cs/\(task.id)", systemImage: "arrow.triangle.branch")
+                        Label(task.worktreePath, systemImage: "folder")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
                 }
 
                 Spacer()
@@ -52,7 +60,7 @@ struct TaskDetailView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 340)
+                    .frame(width: 260)
 
                     if activeTab == .diff {
                         Button(action: { showMergeSheet = true }) {
@@ -64,23 +72,15 @@ struct TaskDetailView: View {
                         Button(action: onPopOut) {
                             Label("Pop Out Window", systemImage: "rectangle.portrait.and.arrow.forward")
                         }
-                        if !task.isRemote {
-                            Button(action: {
-                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
-                            }) {
-                                Label("Reveal in Finder", systemImage: "folder")
-                            }
+                        Button(action: {
+                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
+                        }) {
+                            Label("Reveal in Finder", systemImage: "folder")
                         }
                         Button(action: {
-                            if let host = task.sshHost {
-                                let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
-                                    "code", "--remote", "ssh-remote+\(host)", task.worktreePath
-                                ])
-                            } else {
-                                let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
-                                    "code", task.worktreePath
-                                ])
-                            }
+                            let _ = try? ShellHelper.launchDetached("/usr/bin/env", arguments: [
+                                "code", task.worktreePath
+                            ])
                         }) {
                             Label("Open in VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                         }
@@ -140,15 +140,13 @@ struct TaskDetailView: View {
                     EmbeddedTerminalView(task: task, onProcessExit: onProcessExit)
                 case .diff:
                     FileDiffView(task: task)
-                case .shell:
-                    EmbeddedShellView(task: task)
                 case .finder:
                     EmbeddedFinderView(task: task)
                 }
             }
         }
         .sheet(isPresented: $showMergeSheet) {
-            MergeSheet(taskId: task.id, worktreePath: task.worktreePath, sshHost: task.sshHost) { action in
+            MergeSheet(taskId: task.id, worktreePath: task.worktreePath) { action in
                 onMergeAction(action)
             }
         }

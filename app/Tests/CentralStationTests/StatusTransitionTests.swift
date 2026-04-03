@@ -73,47 +73,14 @@ private struct StatusHandler {
     }
 
     mutating func resumeTask(_ task: AppTask) {
-        task.isResume = true
         task.status = .starting
     }
 }
 
 private func makeTask(sessionId: String, status: TaskStatus = .pending) -> AppTask {
-    let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+    let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
     task.status = status
-    // We need to match by sessionId, so we use reflection or just test with the auto-generated one
     return task
-}
-
-/// Builds CLI args matching TerminalStore logic
-private func buildClaudeArgs(task: AppTask) -> [String] {
-    if task.isResume {
-        return ["--resume", task.sessionId]
-    } else {
-        var args = ["--session-id", task.sessionId]
-        if let mode = task.permissionMode {
-            args += ["--permission-mode", mode]
-        }
-        if !task.prompt.isEmpty {
-            args.append(task.prompt)
-        }
-        return args
-    }
-}
-
-private func buildRemoteCommand(task: AppTask) -> String {
-    if task.isResume {
-        return "cd '\(task.worktreePath)' && claude --resume \(task.sessionId)"
-    } else {
-        var cmd = "cd '\(task.worktreePath)' && claude --session-id \(task.sessionId)"
-        if let mode = task.permissionMode {
-            cmd += " --permission-mode \(mode)"
-        }
-        if !task.prompt.isEmpty {
-            cmd += " '\(task.prompt)'"
-        }
-        return cmd
-    }
 }
 
 // MARK: - Status Transition Tests
@@ -122,7 +89,7 @@ private func buildRemoteCommand(task: AppTask) -> String {
 struct StatusTransitionTests {
 
     @Test func stopHookActiveTrue_setsWorking() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .waitingForInput
         task.pendingPermission = "Write"
         var handler = StatusHandler(tasks: [task])
@@ -135,7 +102,7 @@ struct StatusTransitionTests {
     }
 
     @Test func stopHookActiveFalse_setsWaitingForInput() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -147,7 +114,7 @@ struct StatusTransitionTests {
     }
 
     @Test func workingToWorkingIsNoOp() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         let before = Date()
         task.lastActivityAt = before
@@ -160,7 +127,7 @@ struct StatusTransitionTests {
     }
 
     @Test func permissionSetsWaitingForInput() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -172,7 +139,7 @@ struct StatusTransitionTests {
     }
 
     @Test func workingClearsPermission() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .waitingForInput
         task.pendingPermission = "Bash"
         var handler = StatusHandler(tasks: [task])
@@ -184,7 +151,7 @@ struct StatusTransitionTests {
     }
 
     @Test func unknownSessionIdIsIgnored() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -196,7 +163,7 @@ struct StatusTransitionTests {
     }
 
     @Test func notificationPermissionPrompt() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -208,7 +175,7 @@ struct StatusTransitionTests {
     }
 
     @Test func notificationIdlePrompt() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -219,7 +186,7 @@ struct StatusTransitionTests {
     }
 
     @Test func notificationElicitation() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -230,7 +197,7 @@ struct StatusTransitionTests {
     }
 
     @Test func unknownNotificationTypeIgnored() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -240,7 +207,7 @@ struct StatusTransitionTests {
     }
 
     @Test func fullCycle_working_stop_working() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -254,7 +221,7 @@ struct StatusTransitionTests {
     // MARK: - Process exit tests
 
     @Test func processExitSetsCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -265,7 +232,7 @@ struct StatusTransitionTests {
     }
 
     @Test func processExitFromWaitingForInput() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .waitingForInput
         var handler = StatusHandler(tasks: [task])
 
@@ -275,7 +242,7 @@ struct StatusTransitionTests {
     }
 
     @Test func processExitIgnoredForAlreadyCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .completed
         let before = Date()
         task.lastActivityAt = before
@@ -288,7 +255,7 @@ struct StatusTransitionTests {
     }
 
     @Test func processExitIgnoredForStopped() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .stopped
         var handler = StatusHandler(tasks: [task])
 
@@ -299,7 +266,7 @@ struct StatusTransitionTests {
 
     @Test func processExitIgnoredForStarting() {
         // Race condition: old process dies after resumeTask sets .starting
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .starting
         var handler = StatusHandler(tasks: [task])
 
@@ -309,7 +276,7 @@ struct StatusTransitionTests {
     }
 
     @Test func resumeRaceCondition_oldProcessExitDoesNotBlockHooks() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -330,7 +297,7 @@ struct StatusTransitionTests {
     }
 
     @Test func processExitUnknownTaskIdIgnored() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -342,7 +309,7 @@ struct StatusTransitionTests {
     // MARK: - Race condition: hook events must not override completed/stopped
 
     @Test func stopHookDoesNotOverrideCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -356,7 +323,7 @@ struct StatusTransitionTests {
     }
 
     @Test func workingHookDoesNotOverrideCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .completed
         var handler = StatusHandler(tasks: [task])
 
@@ -366,7 +333,7 @@ struct StatusTransitionTests {
     }
 
     @Test func permissionHookDoesNotOverrideCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .completed
         var handler = StatusHandler(tasks: [task])
 
@@ -377,7 +344,7 @@ struct StatusTransitionTests {
     }
 
     @Test func notificationHookDoesNotOverrideCompleted() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .completed
         var handler = StatusHandler(tasks: [task])
 
@@ -387,7 +354,7 @@ struct StatusTransitionTests {
     }
 
     @Test func hooksDoNotOverrideStopped() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .stopped
         var handler = StatusHandler(tasks: [task])
 
@@ -405,7 +372,7 @@ struct StatusTransitionTests {
     }
 
     @Test func fullLifecycle_working_stop_processExit() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         var handler = StatusHandler(tasks: [task])
 
@@ -429,61 +396,13 @@ struct StatusTransitionTests {
 struct ResumeTests {
 
     @Test func resumeSetsStartingStatus() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .stopped
         var handler = StatusHandler(tasks: [task])
 
         handler.resumeTask(task)
 
         #expect(task.status == .starting)
-        #expect(task.isResume == true)
-    }
-
-    @Test func resumeUsesResumeFlag() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
-        task.isResume = true
-
-        let args = buildClaudeArgs(task: task)
-
-        #expect(args == ["--resume", task.sessionId])
-    }
-
-    @Test func newTaskUsesSessionId() {
-        let task = AppTask(id: "t1", description: "test", prompt: "do stuff", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
-        task.isResume = false
-
-        let args = buildClaudeArgs(task: task)
-
-        #expect(args == ["--session-id", task.sessionId, "do stuff"])
-    }
-
-    @Test func newTaskWithPermissionMode() {
-        let task = AppTask(id: "t1", description: "test", prompt: "do stuff", worktreePath: "/tmp/wt", projectPath: "/tmp/proj", permissionMode: "auto")
-        task.isResume = false
-
-        let args = buildClaudeArgs(task: task)
-
-        #expect(args == ["--session-id", task.sessionId, "--permission-mode", "auto", "do stuff"])
-    }
-
-    @Test func remoteResumeUsesResumeFlag() {
-        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/home/user/wt", projectPath: "/home/user/proj", sshHost: "user@host")
-        task.isResume = true
-
-        let cmd = buildRemoteCommand(task: task)
-
-        #expect(cmd == "cd '/home/user/wt' && claude --resume \(task.sessionId)")
-    }
-
-    @Test func remoteNewTaskUsesSessionId() {
-        let task = AppTask(id: "t1", description: "test", prompt: "do stuff", worktreePath: "/home/user/wt", projectPath: "/home/user/proj", sshHost: "user@host")
-        task.isResume = false
-
-        let cmd = buildRemoteCommand(task: task)
-
-        #expect(cmd.contains("--session-id \(task.sessionId)"))
-        #expect(cmd.contains("'do stuff'"))
-        #expect(!cmd.contains("--resume"))
     }
 }
 
@@ -587,8 +506,7 @@ struct HookEndToEndTests {
     }
 
     private func makeWorkingTask() -> (AppTask, StatusHandler) {
-        let task = AppTask(id: "t1", description: "test task", prompt: "do stuff",
-                          worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
         task.status = .working
         let handler = StatusHandler(tasks: [task])
         return (task, handler)

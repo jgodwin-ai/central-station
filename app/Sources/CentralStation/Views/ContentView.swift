@@ -1,20 +1,27 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State var coordinator: TaskCoordinator
     var recommendedWarning: String?
-    @State private var selectedTask: AppTask?
-    @State private var showAddTask = false
-    @State private var addTaskProjectPath: String?
+    @State private var selectedTaskId: String?
     @State private var showHookInfo = false
-    @State private var showManageRemotes = false
     @State private var showChimeSettings = false
     @State private var showRecommendedWarning = true
+    @State private var showNotGitRepoAlert = false
+    @State private var showNewTaskPopover = false
+    @State private var newTaskName = ""
+    @State private var newTaskRepo: Repo?
     @State private var mergeError: String?
     @State private var updateInfo: UpdateChecker.UpdateInfo?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
     @Environment(\.openWindow) private var openWindow
+
+    private var selectedTask: AppTask? {
+        guard let selectedTaskId else { return nil }
+        return coordinator.tasks.first { $0.id == selectedTaskId }
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -70,21 +77,26 @@ struct ContentView: View {
                     Divider()
                 }
 
-                Button(action: { showAddTask = true }) {
-                    Label("New Task", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut("n", modifiers: .command)
-                .padding(10)
-
-                Divider()
-
                 TaskListView(
+                    repos: coordinator.repoPersistence.repos,
                     tasks: coordinator.tasks,
-                    selectedTask: $selectedTask,
+                    selectedTaskId: $selectedTaskId,
+                    onAddTask: { repo in
+                        if coordinator.repoPersistence.requireTaskName {
+                            newTaskRepo = repo
+                            newTaskName = ""
+                            showNewTaskPopover = true
+                        } else {
+                            Task {
+                                if let task = try? await coordinator.addTask(for: repo) {
+                                    selectedTaskId = task.id
+                                }
+                            }
+                        }
+                    },
+                    onRemoveRepo: { repo in
+                        coordinator.removeRepo(id: repo.id)
+                    },
                     onFocus: { task in
                         if coordinator.poppedOutTaskIds.contains(task.id) {
                             openWindow(id: "terminal", value: task.id)
@@ -96,18 +108,14 @@ struct ContentView: View {
                     },
                     onDelete: { task in
                         Task {
-                            if selectedTask?.id == task.id {
-                                selectedTask = nil
+                            if selectedTaskId == task.id {
+                                selectedTaskId = nil
                             }
                             await coordinator.deleteTask(task)
                         }
                     },
                     onResume: { task in
                         coordinator.resumeTask(task)
-                    },
-                    onAddTaskForRepo: { directory in
-                        addTaskProjectPath = directory
-                        showAddTask = true
                     }
                 )
 
@@ -120,7 +128,7 @@ struct ContentView: View {
                         Text("\(coordinator.needsInputCount) waiting")
                             .font(.caption)
                         Spacer()
-                        Text("⌘↑↓")
+                        Text("Cmd+Up/Down")
                             .font(.caption2.monospaced())
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -149,28 +157,51 @@ struct ContentView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(coordinator.hooksInstalled ? Color.secondary : Color.orange)
                     Spacer()
+                    Toggle(isOn: Binding(
+                        get: { coordinator.repoPersistence.requireTaskName },
+                        set: { coordinator.repoPersistence.requireTaskName = $0; coordinator.saveRepos() }
+                    )) {
+                        Image(systemName: "tag")
+                    }
+                    .toggleStyle(.checkbox)
+                    .help("Require task name before creating")
                     Button(action: { showChimeSettings = true }) {
                         Image(systemName: "bell.fill")
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
                     .help("Notification settings")
-                    Button(action: { showManageRemotes = true }) {
-                        Label("Remotes", systemImage: "network")
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
                 }
                 .padding(8)
             }
             .background(.background.secondary)
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: pickRepoFolder) {
+                        Label("Add Repo", systemImage: "plus.rectangle.on.folder")
+                    }
+                }
+            }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                for provider in providers {
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url else { return }
+                        let path = url.path
+                        if FileManager.default.fileExists(atPath: path + "/.git") {
+                            DispatchQueue.main.async {
+                                coordinator.addRepo(path: path)
+                            }
+                        }
+                    }
+                }
+                return true
+            }
         } detail: {
             if let task = selectedTask {
                 let isPoppedOut = coordinator.poppedOutTaskIds.contains(task.id)
 
                 if isPoppedOut {
-                    // Terminal is in a separate window
                     VStack(spacing: 16) {
                         Image(systemName: "rectangle.portrait.and.arrow.forward")
                             .font(.system(size: 40))
@@ -217,18 +248,18 @@ struct ContentView: View {
                     )
                     .id("\(task.id)-\(task.status)")
                 }
-            } else if coordinator.tasks.isEmpty {
+            } else if coordinator.tasks.isEmpty && coordinator.repoPersistence.repos.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "tram.fill")
                         .font(.system(size: 48))
                         .foregroundStyle(.tertiary)
-                    Text("No tasks yet")
+                    Text("No repos yet")
                         .font(.title3)
                         .foregroundStyle(.secondary)
-                    Text("Create a task to start a Claude Code session")
+                    Text("Add a git repository to start creating tasks")
                         .font(.callout)
                         .foregroundStyle(.tertiary)
-                    Button("New Task") { showAddTask = true }
+                    Button("Add Repo") { pickRepoFolder() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                 }
@@ -245,31 +276,6 @@ struct ContentView: View {
             coordinator.tasks.forEach { _ in }
             Task { await coordinator.refreshUsage() }
         }
-        .sheet(isPresented: $showAddTask, onDismiss: { addTaskProjectPath = nil }) {
-            AddTaskSheet(defaultProjectPath: coordinator.projectPath, remoteStore: coordinator.remoteStore, onAdd: { id, description, prompt, mode, customPath, useWorktree, remote, remotePath in
-                Task {
-                    if let remote, let remotePath {
-                        try? await coordinator.addRemoteTask(
-                            id: id, description: description, prompt: prompt,
-                            permissionMode: mode, remote: remote, remotePath: remotePath
-                        )
-                    } else {
-                        try? await coordinator.addTask(
-                            id: id, description: description,
-                            prompt: prompt, permissionMode: mode,
-                            customProjectPath: customPath,
-                            useWorktree: useWorktree
-                        )
-                    }
-                    if let newTask = coordinator.tasks.last {
-                        selectedTask = newTask
-                    }
-                }
-            }, initialCustomPath: addTaskProjectPath)
-        }
-        .sheet(isPresented: $showManageRemotes) {
-            ManageRemotesSheet(remoteStore: coordinator.remoteStore)
-        }
         .sheet(isPresented: $showChimeSettings) {
             ChimeSettingsSheet()
         }
@@ -285,8 +291,39 @@ struct ContentView: View {
         } message: {
             Text(mergeError ?? "")
         }
+        .alert("Not a Git Repository", isPresented: $showNotGitRepoAlert) {
+            Button("OK") {}
+        } message: {
+            Text("The selected folder is not a git repository. Please select a folder that contains a .git directory.")
+        }
+        .sheet(isPresented: $showNewTaskPopover) {
+            VStack(spacing: 12) {
+                Text("New Task")
+                    .font(.headline)
+                TextField("Task name (used for branch)", text: $newTaskName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 300)
+                    .onSubmit {
+                        createNamedTask()
+                    }
+                Text("Branch: cs/\(previewTaskId)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                HStack {
+                    Button("Cancel") {
+                        showNewTaskPopover = false
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    Button("Create") {
+                        createNamedTask()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newTaskName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding(20)
+        }
         .background {
-            // Hidden buttons for keyboard shortcuts
             Button("") { selectNextNeedingInput(forward: true) }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .hidden()
@@ -297,7 +334,7 @@ struct ContentView: View {
         .onAppear {
             coordinator.checkHooksInstalled()
             if let first = coordinator.tasks.first {
-                selectedTask = first
+                selectedTaskId = first.id
             }
             if !coordinator.hooksInstalled {
                 showHookInfo = true
@@ -308,18 +345,58 @@ struct ContentView: View {
         }
     }
 
+    private var previewTaskId: String {
+        let name = newTaskName.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return "..." }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let date = formatter.string(from: Date())
+        let slug = Validation.sanitizeTaskId(name)
+        return "\(date)-\(slug)"
+    }
+
+    private func createNamedTask() {
+        guard let repo = newTaskRepo else { return }
+        let name = newTaskName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        showNewTaskPopover = false
+        Task {
+            if let task = try? await coordinator.addTask(for: repo, customName: name) {
+                selectedTaskId = task.id
+            }
+        }
+    }
+
+    private func pickRepoFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a git repository folder"
+        if panel.runModal() == .OK, let url = panel.url {
+            let path = url.path
+            if FileManager.default.fileExists(atPath: path + "/.git") {
+                coordinator.addRepo(path: path)
+            } else {
+                showNotGitRepoAlert = true
+            }
+        }
+    }
+
     private func selectNextNeedingInput(forward: Bool) {
         let waiting = coordinator.tasks.filter { $0.status == .waitingForInput }
         guard !waiting.isEmpty else { return }
 
-        if let current = selectedTask,
-           let currentIdx = waiting.firstIndex(where: { $0.id == current.id }) {
+        if let currentId = selectedTaskId,
+           let currentIdx = waiting.firstIndex(where: { $0.id == currentId }) {
             let nextIdx = forward
                 ? waiting.index(after: currentIdx) % waiting.count
                 : (currentIdx == waiting.startIndex ? waiting.count - 1 : waiting.index(before: currentIdx))
-            selectedTask = waiting[nextIdx]
+            selectedTaskId = waiting[nextIdx].id
         } else {
-            selectedTask = forward ? waiting.first : waiting.last
+            selectedTaskId = forward ? waiting.first?.id : waiting.last?.id
         }
     }
 }

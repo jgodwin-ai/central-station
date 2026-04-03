@@ -5,9 +5,9 @@ import Testing
 struct TaskListViewTests {
     @Test("Tasks are grouped by projectPath")
     func tasksGroupedByProjectPath() {
-        let task1 = AppTask(id: "task-1", description: "First", prompt: "", worktreePath: "/repos/alpha/.worktrees/task-1", projectPath: "/repos/alpha")
-        let task2 = AppTask(id: "task-2", description: "Second", prompt: "", worktreePath: "/repos/beta/.worktrees/task-2", projectPath: "/repos/beta")
-        let task3 = AppTask(id: "task-3", description: "Third", prompt: "", worktreePath: "/repos/alpha/.worktrees/task-3", projectPath: "/repos/alpha")
+        let task1 = AppTask(id: "task-1", worktreePath: "/repos/alpha/.worktrees/task-1", projectPath: "/repos/alpha")
+        let task2 = AppTask(id: "task-2", worktreePath: "/repos/beta/.worktrees/task-2", projectPath: "/repos/beta")
+        let task3 = AppTask(id: "task-3", worktreePath: "/repos/alpha/.worktrees/task-3", projectPath: "/repos/alpha")
 
         let groups = AppTask.groupByRepo([task1, task2, task3])
 
@@ -28,7 +28,7 @@ struct TaskListViewTests {
 
     @Test("Single task produces one group")
     func singleTask() {
-        let task = AppTask(id: "task-1", description: "Only", prompt: "", worktreePath: "/repos/solo/.worktrees/task-1", projectPath: "/repos/solo")
+        let task = AppTask(id: "task-1", worktreePath: "/repos/solo/.worktrees/task-1", projectPath: "/repos/solo")
         let groups = AppTask.groupByRepo([task])
 
         #expect(groups.count == 1)

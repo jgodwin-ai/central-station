@@ -5,15 +5,18 @@ import SwiftUI
 @MainActor
 final class TaskCoordinator {
     var tasks: [AppTask] = []
-    var projectPath: String = ""
+    var repoPersistence = RepoPersistence()
     var poppedOutTaskIds: Set<String> = []
     private let hookServer = HookServer()
     private var hookSecret = TerminalLauncher.installedSecret() ?? HookSecret.generate()
-    let remoteStore = RemoteStore()
     private var sessionToTaskId: [String: String] = [:]
 
     private static var persistencePath: String {
         (NSHomeDirectory() as NSString).appendingPathComponent(".claude/central-station-tasks.json")
+    }
+
+    private static var reposPersistencePath: String {
+        (NSHomeDirectory() as NSString).appendingPathComponent(".claude/central-station-repos.json")
     }
 
     var needsInputCount: Int {
@@ -32,6 +35,19 @@ final class TaskCoordinator {
         hooksInstalled = true
     }
 
+    func loadRepos() {
+        guard let data = FileManager.default.contents(atPath: Self.reposPersistencePath),
+              let persistence = try? JSONDecoder().decode(RepoPersistence.self, from: data) else {
+            return
+        }
+        repoPersistence = persistence
+    }
+
+    func saveRepos() {
+        guard let data = try? JSONEncoder().encode(repoPersistence) else { return }
+        try? SecureFile.write(data, to: Self.reposPersistencePath)
+    }
+
     func loadPersistedTasks() {
         guard let data = FileManager.default.contents(atPath: Self.persistencePath),
               let persisted = try? JSONDecoder().decode([PersistedTask].self, from: data) else {
@@ -40,7 +56,7 @@ final class TaskCoordinator {
         for p in persisted {
             // Skip if worktree no longer exists
             guard FileManager.default.fileExists(atPath: p.worktreePath) else { continue }
-            // Skip if already loaded (e.g., from config file)
+            // Skip if already loaded
             guard !tasks.contains(where: { $0.id == p.id }) else { continue }
             let task = AppTask(persisted: p)
             // Everything loads as stopped — user must resume
@@ -58,20 +74,6 @@ final class TaskCoordinator {
         try? SecureFile.write(data, to: Self.persistencePath)
     }
 
-    func loadConfig(from path: String) throws {
-        let config = try ConfigLoader.load(from: path)
-        self.projectPath = config.project
-        for taskConfig in config.tasks {
-            let sanitizedId = Validation.sanitizeTaskId(taskConfig.id)
-            guard !sanitizedId.isEmpty else { continue }
-            guard !tasks.contains(where: { $0.id == sanitizedId }) else { continue }
-            let sanitizedConfig = taskConfig.withId(sanitizedId)
-            let task = AppTask(config: sanitizedConfig, worktreePath: "", projectPath: self.projectPath)
-            tasks.append(task)
-            sessionToTaskId[task.sessionId] = task.id
-        }
-    }
-
     var needsPermissionCount: Int {
         tasks.filter { $0.pendingPermission != nil }.count
     }
@@ -82,8 +84,11 @@ final class TaskCoordinator {
         hookServer.onStop = { [weak self] sessionId, message in
             self?.handleStop(sessionId: sessionId, message: message)
         }
-        hookServer.onWorking = { [weak self] sessionId in
+        hookServer.onWorking = { [weak self] sessionId, promptText in
             self?.handleWorking(sessionId: sessionId)
+            if let promptText, let taskId = self?.sessionToTaskId[sessionId] {
+                self?.summarizeFirstPrompt(taskId: taskId, promptText: promptText)
+            }
         }
         hookServer.onPermissionRequest = { [weak self] sessionId, toolName in
             self?.handlePermission(sessionId: sessionId, toolName: toolName)
@@ -94,93 +99,48 @@ final class TaskCoordinator {
         hookServer.onSessionEnd = { [weak self] sessionId in
             self?.handleSessionEnd(sessionId: sessionId)
         }
-
-        // Only create worktrees for new (pending) tasks from config
-        let pendingTasks = tasks.filter { $0.status == .pending }
-        if !pendingTasks.isEmpty {
-            try await WorktreeManager.ensureGitRepo(at: projectPath)
-        }
-
-        for task in pendingTasks {
-            let worktreePath = try await WorktreeManager.createWorktree(
-                projectPath: projectPath, taskId: task.id
-            )
-            task.worktreePath = worktreePath
-            task.startedAt = Date()
-            task.status = .working
-        }
-
         saveTasks()
     }
 
-    func addTask(id: String, description: String, prompt: String, permissionMode: String? = nil, customProjectPath: String? = nil, useWorktree: Bool = true) async throws {
-        let sanitizedId = Validation.sanitizeTaskId(id)
-        let effectivePath = customProjectPath ?? projectPath
-        try await WorktreeManager.ensureGitRepo(at: effectivePath)
-        let worktreePath: String
-        if useWorktree {
-            worktreePath = try await WorktreeManager.createWorktree(
-                projectPath: effectivePath, taskId: sanitizedId
-            )
-        } else {
-            worktreePath = effectivePath
-        }
-        let task = AppTask(
-            id: sanitizedId,
-            description: description,
-            prompt: prompt,
-            worktreePath: worktreePath,
-            projectPath: effectivePath,
-            permissionMode: permissionMode
-        )
-
+    func addTask(for repo: Repo, customName: String? = nil) async throws -> AppTask {
+        let taskId = repoPersistence.nextTaskId(customName: customName)
+        try await WorktreeManager.ensureGitRepo(at: repo.path)
+        let worktreePath = try await WorktreeManager.createWorktree(projectPath: repo.path, taskId: taskId)
+        let task = AppTask(id: taskId, worktreePath: worktreePath, projectPath: repo.path)
+        task.status = .working
+        task.startedAt = Date()
         tasks.append(task)
         sessionToTaskId[task.sessionId] = task.id
-        task.startedAt = Date()
-        task.status = .working
+        saveRepos()
         saveTasks()
+        return task
     }
 
-    func addRemoteTask(id: String, description: String, prompt: String, permissionMode: String?, remote: RemoteConfig, remotePath: String) async throws {
-        let sanitizedId = Validation.sanitizeTaskId(id)
-        try await TerminalLauncher.installHooksOnRemote(host: remote.sshHost, secret: hookSecret)
-        try await WorktreeManager.ensureGitRepoRemote(host: remote.sshHost, at: remotePath)
-        let worktreePath = try await WorktreeManager.createWorktreeRemote(
-            host: remote.sshHost, projectPath: remotePath, taskId: sanitizedId
-        )
-        let task = AppTask(
-            id: sanitizedId, description: description, prompt: prompt,
-            worktreePath: worktreePath, projectPath: remotePath,
-            permissionMode: permissionMode,
-            remoteAlias: remote.alias, sshHost: remote.sshHost
-        )
-        tasks.append(task)
-        sessionToTaskId[task.sessionId] = task.id
-        task.startedAt = Date()
-        task.status = .working
-        saveTasks()
+    func addRepo(path: String) {
+        guard !repoPersistence.repos.contains(where: { $0.path == path }) else { return }
+        let repo = Repo(path: path)
+        repoPersistence.repos.append(repo)
+        saveRepos()
+    }
 
-        // Update default directory on remote
-        var updated = remote
-        updated.defaultDirectory = remotePath
-        remoteStore.update(updated)
+    func removeRepo(id: String) {
+        guard let repo = repoPersistence.repos.first(where: { $0.id == id }) else { return }
+        let hasActiveTasks = tasks.contains { $0.projectPath == repo.path && $0.status != .completed && $0.status != .stopped }
+        guard !hasActiveTasks else { return }
+        repoPersistence.repos.removeAll { $0.id == id }
+        saveRepos()
     }
 
     func resumeTask(_ task: AppTask) {
         TerminalStore.shared.killTerminal(for: task.id)
         sessionToTaskId[task.sessionId] = task.id
-        task.isResume = true
         task.startedAt = Date()
         task.status = .starting
         saveTasks()
     }
 
     func refreshDiff(for task: AppTask) async {
-        if let host = task.sshHost {
-            task.diff = await WorktreeManager.getDiffRemote(host: host, worktreePath: task.worktreePath)
-        } else {
-            task.diff = await WorktreeManager.getDiff(worktreePath: task.worktreePath)
-        }
+        task.diff = await WorktreeManager.getDiff(worktreePath: task.worktreePath)
     }
 
     func handleMergeAction(task: AppTask, action: MergeAction) async throws -> String? {
@@ -191,50 +151,52 @@ final class TaskCoordinator {
         case .createPR(let msg): message = msg
         }
 
-        if let host = task.sshHost {
-            try await WorktreeManager.commitWorktreeRemote(host: host, worktreePath: task.worktreePath, message: message)
-            var prURL: String?
-            switch action {
-            case .mergeToMain:
-                try await WorktreeManager.mergeToMainRemote(host: host, projectPath: task.projectPath, taskId: task.id, message: message)
-            case .createBranch:
-                try await WorktreeManager.pushBranchRemote(host: host, projectPath: task.projectPath, taskId: task.id)
-            case .createPR:
-                prURL = try await WorktreeManager.createPRRemote(host: host, projectPath: task.projectPath, taskId: task.id, message: message)
-            }
-            task.status = .completed
-            saveTasks()
-            return prURL
-        } else {
-            try await WorktreeManager.commitWorktree(worktreePath: task.worktreePath, message: message)
-            var prURL: String?
-            switch action {
-            case .mergeToMain:
-                if task.hasWorktree {
-                    try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
-                }
-                // No worktree = already on main, commit is enough
-            case .createBranch:
-                try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id, hasWorktree: task.hasWorktree)
-            case .createPR:
-                prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message, hasWorktree: task.hasWorktree)
-            }
-            task.status = .completed
-            saveTasks()
-            return prURL
+        try await WorktreeManager.commitWorktree(worktreePath: task.worktreePath, message: message)
+        var prURL: String?
+        switch action {
+        case .mergeToMain:
+            try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
+        case .createBranch:
+            try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
+        case .createPR:
+            prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message)
         }
+        task.status = .completed
+        saveTasks()
+        return prURL
     }
 
     func deleteTask(_ task: AppTask) async {
         TerminalStore.shared.killTerminal(for: task.id)
-        if let host = task.sshHost {
-            await WorktreeManager.removeWorktreeRemote(host: host, projectPath: task.projectPath, taskId: task.id)
-        } else {
-            await WorktreeManager.removeWorktree(projectPath: task.projectPath, taskId: task.id)
-        }
+        await WorktreeManager.removeWorktree(projectPath: task.projectPath, taskId: task.id)
         sessionToTaskId.removeValue(forKey: task.sessionId)
         tasks.removeAll { $0.id == task.id }
         saveTasks()
+    }
+
+    func summarizeFirstPrompt(taskId: String, promptText: String) {
+        guard let task = tasks.first(where: { $0.id == taskId }),
+              task.description.isEmpty else { return }
+
+        let truncated = String(promptText.prefix(500))
+        Task.detached {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["claude", "-p", "Summarize this task in 3-5 words as a short title. Output ONLY the title, nothing else: \(truncated)"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let summary = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !summary.isEmpty {
+                await MainActor.run {
+                    task.description = summary
+                    self.saveTasks()
+                }
+            }
+        }
     }
 
     func refreshUsage() async {

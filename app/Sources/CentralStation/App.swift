@@ -69,6 +69,7 @@ struct CentralStationApp: App {
     private func startup() async {
         guard !hasStarted && errorMessage == nil else { return }
 
+        // 1. Check system requirements
         let requirements = RequirementChecker.check()
         if !requirements.canStart {
             errorMessage = RequirementChecker.formatEssentialError(requirements.missingEssential)
@@ -80,28 +81,14 @@ struct CentralStationApp: App {
 
         Notifier.requestPermission()
 
-        coordinator.projectPath = FileManager.default.currentDirectoryPath
-
+        // 2. Load persisted tasks
         coordinator.loadPersistedTasks()
-        coordinator.remoteStore.load()
 
-        let args = CommandLine.arguments
-        var configPath: String?
+        // 3. Load repos
+        coordinator.loadRepos()
 
-        if args.count > 1 {
-            configPath = args[1]
-        } else {
-            let cwd = FileManager.default.currentDirectoryPath
-            let candidates = ["tasks.yaml", "tasks.yml", "tasks.json"]
-            configPath = candidates
-                .map { (cwd as NSString).appendingPathComponent($0) }
-                .first { FileManager.default.fileExists(atPath: $0) }
-        }
-
+        // 4. Start coordinator (hook server)
         do {
-            if let configPath {
-                try coordinator.loadConfig(from: configPath)
-            }
             hasStarted = true
             try await coordinator.start()
         } catch {

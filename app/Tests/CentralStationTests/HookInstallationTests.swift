@@ -648,8 +648,8 @@ struct NotificationHandlerPersistenceTests {
     /// Simulates handleNotification with tracking
     private func traceNotification(type: String, initialStatus: TaskStatus = .working) -> HandlerTrace {
         var trace = HandlerTrace()
-        let task = AppTask(id: "t1", description: "test task", prompt: "test",
-                          worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        let task = AppTask(id: "t1", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.description = "test task"
         task.status = initialStatus
 
         // Guard: terminal states
@@ -831,10 +831,8 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func stopOnlyAffectsMatchingTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
         task1.status = .working
         task2.status = .working
         var handler = MultiTaskHandler(tasks: [task1, task2])
@@ -846,10 +844,8 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func workingOnlyAffectsMatchingTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
         task1.status = .waitingForInput
         task2.status = .waitingForInput
         var handler = MultiTaskHandler(tasks: [task1, task2])
@@ -861,10 +857,8 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func notificationOnlyAffectsMatchingTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
         task1.status = .working
         task2.status = .working
         var handler = MultiTaskHandler(tasks: [task1, task2])
@@ -878,10 +872,8 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func permissionOnlyAffectsMatchingTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
         task1.status = .working
         task2.status = .working
         var handler = MultiTaskHandler(tasks: [task1, task2])
@@ -895,10 +887,8 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func sessionEndOnlyAffectsMatchingTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
         task1.status = .working
         task2.status = .working
         var handler = MultiTaskHandler(tasks: [task1, task2])
@@ -910,8 +900,7 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func sessionEndIgnoresAlreadyCompletedTask() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
         task1.status = .completed
         var handler = MultiTaskHandler(tasks: [task1])
 
@@ -921,12 +910,9 @@ struct MultiTaskHookIsolationTests {
     }
 
     @Test func interleaved_multipleTaskLifecycles() {
-        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
-                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
-        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
-                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
-        let task3 = AppTask(id: "t3", description: "task3", prompt: "p3",
-                           worktreePath: "/tmp/wt3", projectPath: "/tmp/proj")
+        let task1 = AppTask(id: "t1", worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        let task3 = AppTask(id: "t3", worktreePath: "/tmp/wt3", projectPath: "/tmp/proj")
         task1.status = .working
         task2.status = .working
         task3.status = .working
