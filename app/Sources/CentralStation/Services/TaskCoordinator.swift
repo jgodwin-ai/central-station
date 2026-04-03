@@ -114,12 +114,16 @@ final class TaskCoordinator {
     }
 
     func addRepo(path: String) {
+        guard !repoPersistence.repos.contains(where: { $0.path == path }) else { return }
         let repo = Repo(path: path)
         repoPersistence.repos.append(repo)
         saveRepos()
     }
 
     func removeRepo(id: String) {
+        guard let repo = repoPersistence.repos.first(where: { $0.id == id }) else { return }
+        let hasActiveTasks = tasks.contains { $0.projectPath == repo.path && $0.status != .completed && $0.status != .stopped }
+        guard !hasActiveTasks else { return }
         repoPersistence.repos.removeAll { $0.id == id }
         saveRepos()
     }
@@ -150,9 +154,9 @@ final class TaskCoordinator {
         case .mergeToMain:
             try await WorktreeManager.mergeToMain(projectPath: task.projectPath, taskId: task.id, message: message)
         case .createBranch:
-            try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id, hasWorktree: true)
+            try await WorktreeManager.pushBranch(projectPath: task.projectPath, taskId: task.id)
         case .createPR:
-            prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message, hasWorktree: true)
+            prURL = try await WorktreeManager.createPR(projectPath: task.projectPath, taskId: task.id, message: message)
         }
         task.status = .completed
         saveTasks()
@@ -171,10 +175,11 @@ final class TaskCoordinator {
         guard let task = tasks.first(where: { $0.id == taskId }),
               task.description.isEmpty else { return }
 
-        Task {
+        let truncated = String(promptText.prefix(500))
+        Task.detached {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["claude", "-p", "Summarize this task in 3-5 words as a short title. Output ONLY the title, nothing else: \(promptText)"]
+            process.arguments = ["claude", "-p", "Summarize this task in 3-5 words as a short title. Output ONLY the title, nothing else: \(truncated)"]
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = FileHandle.nullDevice

@@ -26,6 +26,8 @@ public struct RepoPersistence: Codable {
 
     public mutating func nextTaskId() -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         let date = formatter.string(from: Date())
         let id = "\(date)-task-\(nextTaskNumber)"
