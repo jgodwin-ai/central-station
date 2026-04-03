@@ -10,6 +10,9 @@ struct ContentView: View {
     @State private var showChimeSettings = false
     @State private var showRecommendedWarning = true
     @State private var showNotGitRepoAlert = false
+    @State private var showNewTaskPopover = false
+    @State private var newTaskName = ""
+    @State private var newTaskRepo: Repo?
     @State private var mergeError: String?
     @State private var updateInfo: UpdateChecker.UpdateInfo?
     @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
@@ -79,9 +82,15 @@ struct ContentView: View {
                     tasks: coordinator.tasks,
                     selectedTaskId: $selectedTaskId,
                     onAddTask: { repo in
-                        Task {
-                            if let task = try? await coordinator.addTask(for: repo) {
-                                selectedTaskId = task.id
+                        if coordinator.repoPersistence.requireTaskName {
+                            newTaskRepo = repo
+                            newTaskName = ""
+                            showNewTaskPopover = true
+                        } else {
+                            Task {
+                                if let task = try? await coordinator.addTask(for: repo) {
+                                    selectedTaskId = task.id
+                                }
                             }
                         }
                     },
@@ -148,6 +157,14 @@ struct ContentView: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(coordinator.hooksInstalled ? Color.secondary : Color.orange)
                     Spacer()
+                    Toggle(isOn: Binding(
+                        get: { coordinator.repoPersistence.requireTaskName },
+                        set: { coordinator.repoPersistence.requireTaskName = $0; coordinator.saveRepos() }
+                    )) {
+                        Image(systemName: "tag")
+                    }
+                    .toggleStyle(.checkbox)
+                    .help("Require task name before creating")
                     Button(action: { showChimeSettings = true }) {
                         Image(systemName: "bell.fill")
                     }
@@ -279,6 +296,33 @@ struct ContentView: View {
         } message: {
             Text("The selected folder is not a git repository. Please select a folder that contains a .git directory.")
         }
+        .sheet(isPresented: $showNewTaskPopover) {
+            VStack(spacing: 12) {
+                Text("New Task")
+                    .font(.headline)
+                TextField("Task name (used for branch)", text: $newTaskName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 300)
+                    .onSubmit {
+                        createNamedTask()
+                    }
+                Text("Branch: cs/\(previewTaskId)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                HStack {
+                    Button("Cancel") {
+                        showNewTaskPopover = false
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    Button("Create") {
+                        createNamedTask()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newTaskName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding(20)
+        }
         .background {
             Button("") { selectNextNeedingInput(forward: true) }
                 .keyboardShortcut(.downArrow, modifiers: .command)
@@ -297,6 +341,30 @@ struct ContentView: View {
             }
             Task {
                 updateInfo = await UpdateChecker.check()
+            }
+        }
+    }
+
+    private var previewTaskId: String {
+        let name = newTaskName.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return "..." }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let date = formatter.string(from: Date())
+        let slug = Validation.sanitizeTaskId(name)
+        return "\(date)-\(slug)"
+    }
+
+    private func createNamedTask() {
+        guard let repo = newTaskRepo else { return }
+        let name = newTaskName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        showNewTaskPopover = false
+        Task {
+            if let task = try? await coordinator.addTask(for: repo, customName: name) {
+                selectedTaskId = task.id
             }
         }
     }

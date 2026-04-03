@@ -99,8 +99,8 @@ final class TaskCoordinator {
         saveTasks()
     }
 
-    func addTask(for repo: Repo) async throws -> AppTask {
-        let taskId = repoPersistence.nextTaskId()
+    func addTask(for repo: Repo, customName: String? = nil) async throws -> AppTask {
+        let taskId = repoPersistence.nextTaskId(customName: customName)
         try await WorktreeManager.ensureGitRepo(at: repo.path)
         let worktreePath = try await WorktreeManager.createWorktree(projectPath: repo.path, taskId: taskId)
         let task = AppTask(id: taskId, worktreePath: worktreePath, projectPath: repo.path)

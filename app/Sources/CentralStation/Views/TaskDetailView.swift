@@ -30,8 +30,17 @@ struct TaskDetailView: View {
                             .font(.title3)
                             .foregroundStyle(task.status.color)
                     }
-                    Text(task.description)
-                        .foregroundStyle(.secondary)
+                    if !task.description.isEmpty {
+                        Text(task.description)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 12) {
+                        Label("cs/\(task.id)", systemImage: "arrow.triangle.branch")
+                        Label(task.worktreePath, systemImage: "folder")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
                 }
 
                 Spacer()

@@ -64,4 +64,35 @@ struct RepoPersistenceTests {
         #expect(id.hasSuffix("-task-7"))
         #expect(persistence.nextTaskNumber == 8)
     }
+
+    @Test func customNameUsedInTaskId() {
+        var persistence = RepoPersistence(repos: [], nextTaskNumber: 1)
+        let id = persistence.nextTaskId(customName: "Fix Auth Bug")
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = formatter.string(from: Date())
+
+        #expect(id == "\(today)-fix-auth-bug")
+        #expect(persistence.nextTaskNumber == 2)
+    }
+
+    @Test func emptyCustomNameFallsBackToCounter() {
+        var persistence = RepoPersistence(repos: [], nextTaskNumber: 3)
+        let id = persistence.nextTaskId(customName: "")
+        #expect(id.hasSuffix("-task-3"))
+    }
+
+    @Test func requireTaskNameDefaultsFalse() {
+        let persistence = RepoPersistence()
+        #expect(persistence.requireTaskName == false)
+    }
+
+    @Test func requireTaskNameRoundTrip() throws {
+        let persistence = RepoPersistence(repos: [], nextTaskNumber: 1, requireTaskName: true)
+        let data = try JSONEncoder().encode(persistence)
+        let decoded = try JSONDecoder().decode(RepoPersistence.self, from: data)
+        #expect(decoded.requireTaskName == true)
+    }
 }
