@@ -4,15 +4,21 @@
 
 # Central Station
 
-A multi-agent, multi-repo command center for Claude Code. Run multiple Claude Code instances across repos and machines, each in its own git worktree, and monitor them all from a single native macOS dashboard.
+A multi-agent, multi-repo command center for Claude Code. Run multiple Claude Code instances across repos, each in its own git worktree, and monitor them all from a single native macOS dashboard.
 
-Unlike wrapper tools that simulate agents, Central Station uses **native Claude Code installations**. Every agent gets the full Claude Code harness — tool use, file editing, MCP servers, permissions — with a dashboard that shows you what's happening across all of them. A lightweight localhost hook server lets Claude Code notify the dashboard when it needs input, so you never miss a prompt.
+Unlike wrapper tools that simulate agents, Central Station uses **native Claude Code installations**. Every agent gets the full, unmodified Claude Code harness — tool use, file editing, MCP servers, permissions, hooks, voice control, remote control, and every other native feature — with a dashboard that shows you what's happening across all of them. A lightweight localhost hook server lets Claude Code notify the dashboard when it needs input, so you never miss a prompt.
 
-Remote agent development (SSH) is supported, and dev container support is in progress.
+**Full Claude Code compatibility** is the key differentiator. Because Central Station embeds real Claude Code sessions rather than reimplementing them, every native feature works out of the box — including voice mode, remote control, custom slash commands, and MCP server integrations. When Anthropic ships new capabilities, they just work.
 
 <p align="center">
   <img src="central_station.png" alt="Central Station dashboard" width="800">
 </p>
+
+## Philosophy: Worktrees or Bust
+
+Central Station is opinionated. It firmly believes that all agent-driven development should happen in git worktrees — isolated branches where agents can build, test, and even push PRs without stepping on each other or on your working copy.
+
+If you're not ready to adopt worktrees, Central Station probably isn't for you. But if you are, this is a preview of how autonomous agents should operate: each one gets a clean workspace, works independently, runs tests, creates pull requests, and reports back — all without blocking you or any other agent.
 
 ## Features
 
@@ -35,6 +41,10 @@ Open any task's worktree directly in VS Code with a single click. Jump from moni
 ### Cost Tracking
 
 Monitor API spend per task and across all running agents. The dashboard tracks token usage and cost in real time, so you always know what your fleet of agents is costing you.
+
+### Full Native Claude Code Support
+
+Voice control, remote control, MCP servers, custom slash commands, hooks, permissions — every Claude Code feature works because Central Station runs real Claude Code sessions, not a reimplementation.
 
 ## Install
 
@@ -98,8 +108,6 @@ Central Station is a native SwiftUI macOS app. Here's how the pieces fit togethe
 **Hook server** — A local HTTP server receives Claude Code `Stop` hook events. When an agent finishes a turn and is waiting for input, the hook fires a POST to the dashboard, updating task status in real time. No polling.
 
 **Embedded terminals** — Each task has a terminal tab running the actual Claude Code session. You can also pop it out or open the worktree in VS Code.
-
-**Remote tasks (SSH)** — Tasks can target remote machines. Central Station SSHs into the host, creates a worktree there, and launches Claude Code over the connection. A reverse SSH tunnel (`-R 19280:localhost:19280`) routes hook events back to the local dashboard, so monitoring works transparently.
 
 ## Disclaimer
 
