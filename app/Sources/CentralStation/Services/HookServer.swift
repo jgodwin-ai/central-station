@@ -135,6 +135,7 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
+        // Routing logic is mirrored in HookEndToEndTests.dispatch — update both together
         if firstLine.contains("/hook/stop") {
             if payload.stop_hook_active == true {
                 // This stop was triggered by the hook itself — ignore to prevent loops
