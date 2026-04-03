@@ -38,7 +38,7 @@ struct TaskDetailView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    if task.status == .stopped {
+                    if task.status == .stopped || task.status == .completed {
                         Button(action: onResume) {
                             Label("Resume", systemImage: "play.fill")
                         }
@@ -115,12 +115,12 @@ struct TaskDetailView: View {
             }
 
             // Content
-            if task.status == .stopped {
+            if task.status == .stopped || task.status == .completed {
                 VStack(spacing: 16) {
-                    Image(systemName: "stop.circle")
+                    Image(systemName: task.status == .completed ? "checkmark.circle" : "stop.circle")
                         .font(.system(size: 48))
                         .foregroundStyle(.tertiary)
-                    Text("Task is stopped")
+                    Text(task.status == .completed ? "Session ended" : "Task is stopped")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                     Text("Resume to start a new Claude Code session in this worktree")

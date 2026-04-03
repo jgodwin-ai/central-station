@@ -57,6 +57,18 @@ struct HookInstallationTests {
                     "type": "command",
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/stop -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
+            ]],
+            "SessionEnd": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/session-end -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
+                ]]
+            ]],
+            "PostToolUse": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/prompt -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
+                ]]
             ]]
         ]
     }
@@ -75,7 +87,7 @@ struct HookInstallationTests {
 
     @Test func allRequiredHookTypesExist() {
         let hooks = buildHooksJSON(secret: "test-secret")
-        let required = ["UserPromptSubmit", "Stop", "Notification", "PermissionRequest", "SubagentStop"]
+        let required = ["UserPromptSubmit", "Stop", "Notification", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in required {
             #expect(hooks[key] != nil, "Missing hook type: \(key)")
         }
@@ -131,6 +143,20 @@ struct HookInstallationTests {
                 "SubagentStop must include auth header — this was the root cause of missing notifications")
     }
 
+    @Test func sessionEndIncludesAuthHeader() {
+        let secret = "my-secret-token"
+        let hooks = buildHooksJSON(secret: secret)
+        let cmd = extractCommand(from: hooks, key: "SessionEnd")!
+        #expect(cmd.contains("Authorization: Bearer \(secret)"))
+    }
+
+    @Test func postToolUseIncludesAuthHeader() {
+        let secret = "my-secret-token"
+        let hooks = buildHooksJSON(secret: secret)
+        let cmd = extractCommand(from: hooks, key: "PostToolUse")!
+        #expect(cmd.contains("Authorization: Bearer \(secret)"))
+    }
+
     // MARK: - Correct endpoints
 
     @Test func userPromptSubmitHitsPromptEndpoint() {
@@ -167,6 +193,19 @@ struct HookInstallationTests {
         let hooks = buildHooksJSON(secret: "s")
         let cmd = extractCommand(from: hooks, key: "SubagentStop")!
         #expect(cmd.contains("/hook/stop"))
+    }
+
+    @Test func sessionEndHitsSessionEndEndpoint() {
+        let hooks = buildHooksJSON(secret: "s")
+        let cmd = extractCommand(from: hooks, key: "SessionEnd")!
+        #expect(cmd.contains("/hook/session-end"))
+    }
+
+    @Test func postToolUseHitsPromptEndpoint() {
+        let hooks = buildHooksJSON(secret: "s")
+        let cmd = extractCommand(from: hooks, key: "PostToolUse")!
+        #expect(cmd.contains("/hook/prompt"),
+                "PostToolUse must hit /hook/prompt to clear pendingPermission and transition back to working")
     }
 
     // MARK: - Notification matchers
@@ -215,7 +254,7 @@ struct HookInstallationTests {
 
     @Test func allHooksUsePOST() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("-X POST"), "\(key) must use POST method")
@@ -226,7 +265,7 @@ struct HookInstallationTests {
 
     @Test func allHooksIncludeContentType() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("Content-Type: application/json"), "\(key) must set Content-Type")
@@ -237,7 +276,7 @@ struct HookInstallationTests {
 
     @Test func allHooksPassPayloadViaCat() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("$(cat)"), "\(key) must pipe stdin payload")
@@ -248,7 +287,7 @@ struct HookInstallationTests {
 
     @Test func allHooksHaveTimeout() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("--connect-timeout"), "\(key) must have connect timeout")
@@ -260,7 +299,7 @@ struct HookInstallationTests {
 
     @Test func allHooksFailSilently() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.hasSuffix("|| true"), "\(key) must fail silently to not block Claude")
@@ -290,6 +329,7 @@ struct HookRoutingTests {
         case working(sessionId: String)
         case notification(sessionId: String, type: String)
         case permission(sessionId: String, toolName: String)
+        case sessionEnd(sessionId: String)
         case ignored
         case rejected
     }
@@ -329,6 +369,11 @@ struct HookRoutingTests {
             if let sessionId = payload.session_id {
                 let toolName = payload.tool_name ?? "unknown"
                 return .permission(sessionId: sessionId, toolName: toolName)
+            }
+            return .ignored
+        } else if endpoint == "/hook/session-end" {
+            if let sessionId = payload.session_id {
+                return .sessionEnd(sessionId: sessionId)
             }
             return .ignored
         }
@@ -453,6 +498,44 @@ struct HookRoutingTests {
                                    tool_name: "Bash", tool_input: nil, notification_type: nil)
         let result = route(endpoint: "/hook/permission", payload: payload, secret: "", authHeader: nil)
         #expect(result == .ignored)
+    }
+
+    // MARK: - Session end endpoint routing
+
+    @Test func sessionEndEndpoint_routesToSessionEnd() {
+        let payload = HookPayload(session_id: "s1", hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+        let result = route(endpoint: "/hook/session-end", payload: payload, secret: "", authHeader: nil)
+        #expect(result == .sessionEnd(sessionId: "s1"))
+    }
+
+    @Test func sessionEndEndpoint_missingSessionId_ignored() {
+        let payload = HookPayload(session_id: nil, hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+        let result = route(endpoint: "/hook/session-end", payload: payload, secret: "", authHeader: nil)
+        #expect(result == .ignored)
+    }
+
+    @Test func sessionEndEndpoint_withAuth_accepted() {
+        let secret = HookSecret.generate()
+        let payload = HookPayload(session_id: "s1", hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+        let result = route(endpoint: "/hook/session-end", payload: payload,
+                          secret: secret, authHeader: "Bearer \(secret)")
+        #expect(result == .sessionEnd(sessionId: "s1"))
+    }
+
+    @Test func sessionEndEndpoint_withoutAuth_rejected() {
+        let secret = HookSecret.generate()
+        let payload = HookPayload(session_id: "s1", hook_event_name: nil,
+                                   stop_hook_active: nil, last_assistant_message: nil,
+                                   tool_name: nil, tool_input: nil, notification_type: nil)
+        let result = route(endpoint: "/hook/session-end", payload: payload,
+                          secret: secret, authHeader: nil)
+        #expect(result == .rejected)
     }
 
     // MARK: - Unknown endpoint
@@ -738,6 +821,13 @@ struct MultiTaskHookIsolationTests {
             task.lastMessage = "Permission needed for \(toolName)"
             task.lastActivityAt = Date()
         }
+
+        mutating func handleSessionEnd(sessionId: String) {
+            guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+            guard task.status != .completed && task.status != .stopped else { return }
+            task.status = .completed
+            task.lastActivityAt = Date()
+        }
     }
 
     @Test func stopOnlyAffectsMatchingTask() {
@@ -802,6 +892,32 @@ struct MultiTaskHookIsolationTests {
         #expect(task1.pendingPermission == nil)
         #expect(task2.status == .waitingForInput)
         #expect(task2.pendingPermission == "Write")
+    }
+
+    @Test func sessionEndOnlyAffectsMatchingTask() {
+        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
+                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        let task2 = AppTask(id: "t2", description: "task2", prompt: "p2",
+                           worktreePath: "/tmp/wt2", projectPath: "/tmp/proj")
+        task1.status = .working
+        task2.status = .working
+        var handler = MultiTaskHandler(tasks: [task1, task2])
+
+        handler.handleSessionEnd(sessionId: task1.sessionId)
+
+        #expect(task1.status == .completed)
+        #expect(task2.status == .working, "Task 2 must not be affected by task 1's session end")
+    }
+
+    @Test func sessionEndIgnoresAlreadyCompletedTask() {
+        let task1 = AppTask(id: "t1", description: "task1", prompt: "p1",
+                           worktreePath: "/tmp/wt1", projectPath: "/tmp/proj")
+        task1.status = .completed
+        var handler = MultiTaskHandler(tasks: [task1])
+
+        handler.handleSessionEnd(sessionId: task1.sessionId)
+
+        #expect(task1.status == .completed)
     }
 
     @Test func interleaved_multipleTaskLifecycles() {
