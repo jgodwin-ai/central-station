@@ -37,37 +37,37 @@ public enum TaskStatus: String, Sendable, Codable {
 
 public struct PersistedTask: Codable {
     public let id: String
-    public let description: String
-    public let prompt: String
+    public var description: String
     public let sessionId: String
     public let worktreePath: String
     public let projectPath: String
-    public let permissionMode: String?
-    public let status: TaskStatus
-    public var remoteAlias: String?
-    public var sshHost: String?
+    public var status: TaskStatus
 
-    public init(id: String, description: String, prompt: String, sessionId: String,
-                worktreePath: String, projectPath: String, permissionMode: String?,
-                status: TaskStatus, remoteAlias: String? = nil, sshHost: String? = nil) {
+    public init(id: String, description: String = "", sessionId: String,
+                worktreePath: String, projectPath: String, status: TaskStatus) {
         self.id = id
         self.description = description
-        self.prompt = prompt
         self.sessionId = sessionId
         self.worktreePath = worktreePath
         self.projectPath = projectPath
-        self.permissionMode = permissionMode
         self.status = status
-        self.remoteAlias = remoteAlias
-        self.sshHost = sshHost
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        sessionId = try container.decode(String.self, forKey: .sessionId)
+        worktreePath = try container.decode(String.self, forKey: .worktreePath)
+        projectPath = try container.decode(String.self, forKey: .projectPath)
+        status = try container.decode(TaskStatus.self, forKey: .status)
     }
 }
 
 @Observable
 public final class AppTask: Identifiable, @unchecked Sendable {
     public let id: String
-    public let description: String
-    public let prompt: String
+    public var description: String
     public let sessionId: String
     public var worktreePath: String
     public var projectPath: String
@@ -76,16 +76,9 @@ public final class AppTask: Identifiable, @unchecked Sendable {
     public var startedAt: Date?
     public var lastActivityAt: Date?
     public var lastMessage: String?
-    public var permissionMode: String?
     public var diff: String?
     public var pendingPermission: String?
-    public var remoteAlias: String?
-    public var sshHost: String?
-    public var isResume: Bool = false
     public var usage: SessionUsage?
-
-    public var isRemote: Bool { sshHost != nil }
-    public var hasWorktree: Bool { worktreePath != projectPath }
 
     public var elapsed: String {
         guard let startedAt else { return "--" }
@@ -95,40 +88,21 @@ public final class AppTask: Identifiable, @unchecked Sendable {
         return "\(m)m \(String(format: "%02d", s))s"
     }
 
-    public init(config: TaskConfig, worktreePath: String, projectPath: String) {
-        self.id = config.id
-        self.description = config.description
-        self.prompt = config.prompt
-        self.sessionId = UUID().uuidString.lowercased()
-        self.worktreePath = worktreePath
-        self.projectPath = projectPath
-        self.permissionMode = config.permissionMode
-    }
-
-    public init(id: String, description: String, prompt: String, worktreePath: String, projectPath: String, permissionMode: String? = nil, remoteAlias: String? = nil, sshHost: String? = nil) {
+    public init(id: String, worktreePath: String, projectPath: String) {
         self.id = id
-        self.description = description
-        self.prompt = prompt
-        self.sessionId = UUID().uuidString.lowercased()
+        self.description = ""
+        self.sessionId = UUID().uuidString
         self.worktreePath = worktreePath
         self.projectPath = projectPath
-        self.permissionMode = permissionMode
-        self.remoteAlias = remoteAlias
-        self.sshHost = sshHost
     }
 
     public init(persisted: PersistedTask) {
         self.id = persisted.id
         self.description = persisted.description
-        self.prompt = persisted.prompt
         self.sessionId = persisted.sessionId
         self.worktreePath = persisted.worktreePath
         self.projectPath = persisted.projectPath
-        self.permissionMode = persisted.permissionMode
         self.status = persisted.status
-        self.remoteAlias = persisted.remoteAlias
-        self.sshHost = persisted.sshHost
-        self.isResume = true
     }
 
     public static func groupByRepo(_ tasks: [AppTask]) -> [(directory: String, label: String, tasks: [AppTask])] {
@@ -144,10 +118,10 @@ public final class AppTask: Identifiable, @unchecked Sendable {
 
     public func toPersisted() -> PersistedTask {
         PersistedTask(
-            id: id, description: description, prompt: prompt,
-            sessionId: sessionId, worktreePath: worktreePath,
-            projectPath: projectPath, permissionMode: permissionMode,
-            status: status, remoteAlias: remoteAlias, sshHost: sshHost
+            id: id, description: description,
+            sessionId: sessionId,
+            worktreePath: worktreePath, projectPath: projectPath,
+            status: status
         )
     }
 }
