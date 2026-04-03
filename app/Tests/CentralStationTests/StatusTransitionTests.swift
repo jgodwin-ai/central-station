@@ -251,6 +251,45 @@ struct StatusTransitionTests {
         #expect(task.status == .working)
     }
 
+    // MARK: - SubagentStop should not interrupt working state
+
+    @Test func subagentStop_keepsTaskWorking() {
+        // Simulates: task is working, a subagent finishes (SubagentStop fires).
+        // The routing layer checks hook_event_name == "SubagentStop" and calls
+        // handleWorking instead of handleStop, so the task stays .working
+        // and no notification is triggered.
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        task.lastMessage = "Running subagents..."
+        var handler = StatusHandler(tasks: [task])
+
+        // SubagentStop routes to handleWorking (not handleStop)
+        handler.handleWorking(sessionId: task.sessionId)
+
+        #expect(task.status == .working,
+                "SubagentStop must not flip task to .waitingForInput — main agent is still running")
+        #expect(task.lastMessage == "Running subagents...",
+                "SubagentStop must not overwrite lastMessage")
+        #expect(task.pendingPermission == nil)
+    }
+
+    @Test func subagentStop_vs_mainStop_differentOutcomes() {
+        // Verifies the key behavioral difference: SubagentStop keeps working,
+        // main Stop transitions to waitingForInput
+        let task = AppTask(id: "t1", description: "test", prompt: "test", worktreePath: "/tmp/wt", projectPath: "/tmp/proj")
+        task.status = .working
+        var handler = StatusHandler(tasks: [task])
+
+        // SubagentStop → handleWorking → stays working
+        handler.handleWorking(sessionId: task.sessionId)
+        #expect(task.status == .working)
+
+        // Main Stop → handleStop → transitions to waitingForInput
+        handler.handleStop(sessionId: task.sessionId, message: "All done")
+        #expect(task.status == .waitingForInput)
+        #expect(task.lastMessage == "All done")
+    }
+
     // MARK: - Process exit tests
 
     @Test func processExitSetsCompleted() {
