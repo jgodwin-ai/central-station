@@ -97,6 +97,7 @@ struct TaskRow: View {
             Image(systemName: task.status.icon)
                 .foregroundStyle(task.status.color)
                 .font(.title3)
+                .help("Status: \(task.status.rawValue)")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.description.isEmpty ? task.id : task.description)
@@ -142,7 +143,7 @@ struct TaskRow: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .help("Remove task and delete worktree")
+                .help("Remove task and delete its worktree")
             }
 
             Text(task.elapsed)
