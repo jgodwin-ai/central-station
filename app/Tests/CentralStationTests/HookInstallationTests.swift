@@ -63,6 +63,12 @@ struct HookInstallationTests {
                     "type": "command",
                     "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/session-end -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
                 ]]
+            ]],
+            "PostToolUse": [[
+                "hooks": [[
+                    "type": "command",
+                    "command": "curl -s --connect-timeout 1 --max-time 2 -X POST http://127.0.0.1:\(port)/hook/prompt -H 'Content-Type: application/json' \(authHeader) -d \"$(cat)\" || true"
+                ]]
             ]]
         ]
     }
@@ -81,7 +87,7 @@ struct HookInstallationTests {
 
     @Test func allRequiredHookTypesExist() {
         let hooks = buildHooksJSON(secret: "test-secret")
-        let required = ["UserPromptSubmit", "Stop", "Notification", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let required = ["UserPromptSubmit", "Stop", "Notification", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in required {
             #expect(hooks[key] != nil, "Missing hook type: \(key)")
         }
@@ -144,6 +150,13 @@ struct HookInstallationTests {
         #expect(cmd.contains("Authorization: Bearer \(secret)"))
     }
 
+    @Test func postToolUseIncludesAuthHeader() {
+        let secret = "my-secret-token"
+        let hooks = buildHooksJSON(secret: secret)
+        let cmd = extractCommand(from: hooks, key: "PostToolUse")!
+        #expect(cmd.contains("Authorization: Bearer \(secret)"))
+    }
+
     // MARK: - Correct endpoints
 
     @Test func userPromptSubmitHitsPromptEndpoint() {
@@ -186,6 +199,13 @@ struct HookInstallationTests {
         let hooks = buildHooksJSON(secret: "s")
         let cmd = extractCommand(from: hooks, key: "SessionEnd")!
         #expect(cmd.contains("/hook/session-end"))
+    }
+
+    @Test func postToolUseHitsPromptEndpoint() {
+        let hooks = buildHooksJSON(secret: "s")
+        let cmd = extractCommand(from: hooks, key: "PostToolUse")!
+        #expect(cmd.contains("/hook/prompt"),
+                "PostToolUse must hit /hook/prompt to clear pendingPermission and transition back to working")
     }
 
     // MARK: - Notification matchers
@@ -234,7 +254,7 @@ struct HookInstallationTests {
 
     @Test func allHooksUsePOST() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("-X POST"), "\(key) must use POST method")
@@ -245,7 +265,7 @@ struct HookInstallationTests {
 
     @Test func allHooksIncludeContentType() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("Content-Type: application/json"), "\(key) must set Content-Type")
@@ -256,7 +276,7 @@ struct HookInstallationTests {
 
     @Test func allHooksPassPayloadViaCat() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("$(cat)"), "\(key) must pipe stdin payload")
@@ -267,7 +287,7 @@ struct HookInstallationTests {
 
     @Test func allHooksHaveTimeout() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.contains("--connect-timeout"), "\(key) must have connect timeout")
@@ -279,7 +299,7 @@ struct HookInstallationTests {
 
     @Test func allHooksFailSilently() {
         let hooks = buildHooksJSON(secret: "s")
-        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd"]
+        let keys = ["UserPromptSubmit", "Stop", "PermissionRequest", "SubagentStop", "SessionEnd", "PostToolUse"]
         for key in keys {
             let cmd = extractCommand(from: hooks, key: key)!
             #expect(cmd.hasSuffix("|| true"), "\(key) must fail silently to not block Claude")
