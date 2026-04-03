@@ -1,32 +1,34 @@
 import SwiftUI
 
 struct TaskListView: View {
+    let repos: [Repo]
     let tasks: [AppTask]
-    @Binding var selectedTask: AppTask?
+    @Binding var selectedTaskId: String?
+    var onAddTask: (Repo) -> Void
+    var onRemoveRepo: (Repo) -> Void
     let onFocus: (AppTask) -> Void
     let onStop: (AppTask) -> Void
     let onDelete: (AppTask) -> Void
     var onResume: ((AppTask) -> Void)?
-    var onAddTaskForRepo: ((String) -> Void)?
 
-    private var groupedTasks: [(directory: String, label: String, tasks: [AppTask])] {
-        AppTask.groupByRepo(tasks)
+    private func tasksForRepo(_ repo: Repo) -> [AppTask] {
+        tasks.filter { $0.projectPath == repo.path }
     }
 
     var body: some View {
         List(selection: Binding(
-            get: { selectedTask?.id },
+            get: { selectedTaskId },
             set: { id in
-                selectedTask = tasks.first { $0.id == id }
-                // Auto-resume stopped tasks when selected
-                if let task = selectedTask, task.status == .stopped {
+                selectedTaskId = id
+                if let id, let task = tasks.first(where: { $0.id == id }),
+                   task.status == .stopped {
                     onResume?(task)
                 }
             }
         )) {
-            ForEach(groupedTasks, id: \.directory) { group in
+            ForEach(repos) { repo in
                 Section {
-                    ForEach(group.tasks) { task in
+                    ForEach(tasksForRepo(repo)) { task in
                         TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
                             .tag(task.id)
                     }
@@ -34,18 +36,48 @@ struct TaskListView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "folder.fill")
                             .font(.caption2)
-                        Text(group.label)
+                        Text(repo.name)
                             .font(.caption.bold())
                         Spacer()
-                        Button(action: { onAddTaskForRepo?(group.directory) }) {
+                        Button(action: { onAddTask(repo) }) {
                             Image(systemName: "plus")
                                 .font(.caption2)
                         }
                         .buttonStyle(.borderless)
-                        .help("New task in \(group.label)")
+                        .help("New task in \(repo.name)")
                     }
                     .foregroundStyle(.secondary)
-                    .help(group.directory)
+                    .help(repo.path)
+                    .contextMenu {
+                        Button("Remove Repo", role: .destructive) {
+                            onRemoveRepo(repo)
+                        }
+                    }
+                }
+            }
+
+            // Show tasks that don't belong to any registered repo (orphaned)
+            let orphanedTasks = tasks.filter { task in
+                !repos.contains { $0.path == task.projectPath }
+            }
+            if !orphanedTasks.isEmpty {
+                let grouped = AppTask.groupByRepo(orphanedTasks)
+                ForEach(grouped, id: \.directory) { group in
+                    Section {
+                        ForEach(group.tasks) { task in
+                            TaskRow(task: task, onFocus: { onFocus(task) }, onStop: { onStop(task) }, onDelete: { onDelete(task) })
+                                .tag(task.id)
+                        }
+                    } header: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder")
+                                .font(.caption2)
+                            Text(group.label)
+                                .font(.caption.bold())
+                        }
+                        .foregroundStyle(.secondary)
+                        .help(group.directory)
+                    }
                 }
             }
         }
@@ -65,18 +97,11 @@ struct TaskRow: View {
                 .foregroundStyle(task.status.color)
                 .font(.title3)
 
-            if task.isRemote {
-                Image(systemName: "network")
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
-                    .help(task.remoteAlias ?? task.sshHost ?? "Remote")
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.id)
                     .font(.headline)
                 HStack(spacing: 6) {
-                    Text(task.description)
+                    Text(task.description.isEmpty ? "New task" : task.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -126,12 +151,10 @@ struct TaskRow: View {
         .padding(.vertical, 4)
         .contextMenu {
             Button("Focus Terminal") { onFocus() }
-            if !task.isRemote {
-                Button(action: {
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
-                }) {
-                    Text("Reveal in Finder")
-                }
+            Button(action: {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: task.worktreePath)
+            }) {
+                Text("Reveal in Finder")
             }
             if task.status != .completed {
                 Divider()
