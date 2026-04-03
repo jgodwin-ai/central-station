@@ -23,6 +23,7 @@ final class HookServer: @unchecked Sendable {
     var onWorking: ((String, String?) -> Void)? // (sessionId, promptText) — Claude is actively working
     var onPermissionRequest: ((String, String) -> Void)?
     var onNotification: ((String, String) -> Void)? // (sessionId, notificationType)
+    var onSessionEnd: ((String) -> Void)? // (sessionId) — user exited the session
 
     func start() throws {
         let params = NWParameters.tcp
@@ -136,15 +137,23 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
+        // Routing logic is mirrored in HookEndToEndTests.dispatch — update both together
         if firstLine.contains("/hook/stop") {
             if payload.stop_hook_active == true {
                 // This stop was triggered by the hook itself — ignore to prevent loops
                 return
             }
             if let sessionId = payload.session_id {
-                let message = payload.last_assistant_message ?? ""
-                DispatchQueue.main.async {
-                    self.onStop?(sessionId, message)
+                if payload.hook_event_name == "SubagentStop" {
+                    // Subagent finished but main agent is still running — keep task as working
+                    DispatchQueue.main.async {
+                        self.onWorking?(sessionId, nil)
+                    }
+                } else {
+                    let message = payload.last_assistant_message ?? ""
+                    DispatchQueue.main.async {
+                        self.onStop?(sessionId, message)
+                    }
                 }
             }
         } else if firstLine.contains("/hook/prompt") {
@@ -166,6 +175,12 @@ final class HookServer: @unchecked Sendable {
                 let toolName = payload.tool_name ?? "unknown"
                 DispatchQueue.main.async {
                     self.onPermissionRequest?(sessionId, toolName)
+                }
+            }
+        } else if firstLine.contains("/hook/session-end") {
+            if let sessionId = payload.session_id {
+                DispatchQueue.main.async {
+                    self.onSessionEnd?(sessionId)
                 }
             }
         }

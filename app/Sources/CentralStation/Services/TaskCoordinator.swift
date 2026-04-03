@@ -96,6 +96,9 @@ final class TaskCoordinator {
         hookServer.onNotification = { [weak self] sessionId, notifType in
             self?.handleNotification(sessionId: sessionId, type: notifType)
         }
+        hookServer.onSessionEnd = { [weak self] sessionId in
+            self?.handleSessionEnd(sessionId: sessionId)
+        }
         saveTasks()
     }
 
@@ -284,5 +287,13 @@ final class TaskCoordinator {
         default:
             break
         }
+    }
+
+    private func handleSessionEnd(sessionId: String) {
+        guard let task = tasks.first(where: { $0.sessionId == sessionId }) else { return }
+        guard task.status != .completed && task.status != .stopped else { return }
+        task.status = .completed
+        task.lastActivityAt = Date()
+        saveTasks()
     }
 }
