@@ -1,0 +1,4 @@
+{"type":"server-started","port":53213,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:53213","screen_dir":"/Users/jgoai/central-station/.worktrees/fix-add-new-task/.superpowers/brainstorm/6699-1775219601/content","state_dir":"/Users/jgoai/central-station/.worktrees/fix-add-new-task/.superpowers/brainstorm/6699-1775219601/state"}
+{"type":"screen-added","file":"/Users/jgoai/central-station/.worktrees/fix-add-new-task/.superpowers/brainstorm/6699-1775219601/content/sidebar-comparison.html"}
+{"type":"screen-added","file":"/Users/jgoai/central-station/.worktrees/fix-add-new-task/.superpowers/brainstorm/6699-1775219601/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

@@ -2,7 +2,6 @@ import SwiftUI
 import AppKit
 
 /// An embedded file browser for the worktree directory.
-/// For local tasks, reads from disk directly. For remote tasks, lists via SSH.
 struct EmbeddedFinderView: View {
     let task: AppTask
 
@@ -52,16 +51,14 @@ struct EmbeddedFinderView: View {
                 .buttonStyle(.borderless)
                 .help("Refresh")
 
-                if !task.isRemote {
-                    Button(action: {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: currentPath))
-                    }) {
-                        Image(systemName: "arrow.up.forward.square")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Open in Finder")
+                Button(action: {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: currentPath))
+                }) {
+                    Image(systemName: "arrow.up.forward.square")
+                        .font(.caption)
                 }
+                .buttonStyle(.borderless)
+                .help("Open in Finder")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -153,12 +150,7 @@ struct EmbeddedFinderView: View {
         error = nil
         Task {
             do {
-                let entries: [FileEntry]
-                if let host = task.sshHost {
-                    entries = try await listRemote(host: host, path: path)
-                } else {
-                    entries = try listLocal(path: path)
-                }
+                let entries = try listLocal(path: path)
                 await MainActor.run {
                     currentPath = path
                     files = entries
@@ -185,7 +177,7 @@ struct EmbeddedFinderView: View {
     private func fileAction(_ file: FileEntry) {
         if file.isDirectory {
             navigateTo(currentPath + "/" + file.name)
-        } else if !task.isRemote {
+        } else {
             NSWorkspace.shared.open(URL(fileURLWithPath: currentPath + "/" + file.name))
         }
     }
@@ -227,42 +219,6 @@ struct EmbeddedFinderView: View {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
               let size = attrs[.size] as? UInt64 else { return "" }
         return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
-    }
-
-    // MARK: - Remote file listing
-
-    private func listRemote(host: String, path: String) async throws -> [FileEntry] {
-        let escaped = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        // ls -lAp: long format, almost-all (skip . and ..), append / to dirs
-        let output = try await RemoteShell.run(host: host, command: "ls -lAp \(escaped) 2>/dev/null")
-        var entries: [FileEntry] = []
-        for line in output.split(separator: "\n").dropFirst() { // skip "total N" line
-            let str = String(line)
-            // Parse ls -l output: permissions links owner group size month day time name
-            let parts = str.split(separator: " ", maxSplits: 8, omittingEmptySubsequences: true)
-            guard parts.count >= 9 else { continue }
-            let name = String(parts[8]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let isDir = str.hasPrefix("d")
-            let sizeStr = isDir ? "" : formatRemoteSize(String(parts[4]))
-            guard !name.hasPrefix(".") else { continue }
-            entries.append(FileEntry(
-                id: name,
-                name: name,
-                isDirectory: isDir,
-                size: sizeStr,
-                icon: iconForFile(name: name, isDirectory: isDir)
-            ))
-        }
-        // Sort: directories first, then alphabetical
-        return entries.sorted { lhs, rhs in
-            if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-        }
-    }
-
-    private func formatRemoteSize(_ sizeStr: String) -> String {
-        guard let bytes = Int64(sizeStr) else { return sizeStr }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     // MARK: - File icons
